@@ -1,0 +1,76 @@
+{
+  "name": "lghub2",
+  "version": "0.1.0",
+  "description": "Cross-platform reimplementation of Logitech G Hub",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:main\" \"npm run dev:preload\" \"npm run dev:renderer\"",
+    "dev:main": "webpack --config webpack.main.config.ts --mode development --watch",
+    "dev:preload": "webpack --config webpack.preload.config.ts --mode development --watch",
+    "dev:renderer": "webpack serve --config webpack.renderer.config.ts --mode development",
+    "build": "npm run build:main && npm run build:preload && npm run build:renderer",
+    "build:main": "webpack --config webpack.main.config.ts --mode production",
+    "build:preload": "webpack --config webpack.preload.config.ts --mode production",
+    "build:renderer": "webpack --config webpack.renderer.config.ts --mode production",
+    "start": "electron dist/main/main.js",
+    "package:linux": "electron-builder --linux",
+    "package:win": "electron-builder --win",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0",
+    "node-hid": "^3.1.0",
+    "ws": "^8.18.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^3.7.0",
+    "@reduxjs/toolkit": "^2.3.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.5.0",
+    "concurrently": "^9.1.0",
+    "copy-webpack-plugin": "^12.0.2",
+    "css-loader": "^7.1.0",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.0",
+    "eslint": "^9.16.0",
+    "fork-ts-checker-webpack-plugin": "^9.0.2",
+    "html-webpack-plugin": "^5.6.0",
+    "mini-css-extract-plugin": "^2.9.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-redux": "^9.1.0",
+    "react-router-dom": "^6.28.0",
+    "sass": "^1.82.0",
+    "sass-loader": "^16.0.0",
+    "style-loader": "^4.0.0",
+    "ts-loader": "^9.5.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.7.0",
+    "webpack": "^5.97.0",
+    "webpack-cli": "^5.1.0",
+    "webpack-dev-server": "^5.1.0"
+  },
+  "build": {
+    "appId": "com.lghub2.app",
+    "productName": "LGHUB2",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "data/**/*"
+    ],
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Utility"
+    },
+    "win": {
+      "target": ["nsis"]
+    }
+  }
+}

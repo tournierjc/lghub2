@@ -1,0 +1,51 @@
+# Maintainer: see /home/jct/source/repos/lghub2
+pkgname=lghub2
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Cross-platform reimplementation of Logitech G Hub"
+arch=('x86_64')
+url="https://github.com/lghub2/lghub2"
+license=('custom:UNLICENSED')
+depends=('electron' 'libusb')
+makedepends=('nodejs>=22' 'npm' 'python' 'gcc')
+options=(!debug !strip)
+install="$pkgname.install"
+source=("$pkgname::git+file:///home/jct/source/repos/lghub2")
+sha256sums=('SKIP')
+
+build() {
+  cd "$srcdir/$pkgname"
+
+  npm ci
+
+  local _electron_ver
+  _electron_ver=$(electron --version | sed 's/^v//')
+  npx @electron/rebuild --version "$_electron_ver"
+
+  npm run build
+  npm prune --omit=dev
+}
+
+package() {
+  cd "$srcdir/$pkgname"
+
+  install -dm755 "$pkgdir/usr/lib/$pkgname"
+  cp -r dist    "$pkgdir/usr/lib/$pkgname/"
+  cp -r data    "$pkgdir/usr/lib/$pkgname/"
+  cp -r assets  "$pkgdir/usr/lib/$pkgname/"
+  cp -r node_modules "$pkgdir/usr/lib/$pkgname/"
+
+  install -Dm644 assets/icon.png \
+    "$pkgdir/usr/share/pixmaps/$pkgname.png"
+
+  install -Dm755 /dev/stdin "$pkgdir/usr/bin/$pkgname" << 'EOF'
+#!/bin/bash
+exec electron /usr/lib/lghub2/dist/main/main.js "$@"
+EOF
+
+  install -Dm644 packaging/lghub2.desktop \
+    "$pkgdir/usr/share/applications/$pkgname.desktop"
+
+  install -Dm644 packaging/70-lghub2.rules \
+    "$pkgdir/usr/lib/udev/rules.d/70-lghub2.rules"
+}

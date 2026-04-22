@@ -1,0 +1,16 @@
+post_install() {
+  udevadm control --reload-rules
+  udevadm trigger --subsystem-match=hidraw
+  update-desktop-database -q
+  echo "==> lghub2 installed."
+  echo "==> Log out and back in (or reboot) for udev rules to take effect for your user."
+}
+
+post_upgrade() {
+  post_install
+}
+
+post_remove() {
+  udevadm control --reload-rules
+  update-desktop-database -q
+}

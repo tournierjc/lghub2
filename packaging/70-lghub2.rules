@@ -1,0 +1,2 @@
+# LGHUB2 - grant logged-in user access to Logitech HID devices
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", TAG+="uaccess", TAG+="udev-acl"

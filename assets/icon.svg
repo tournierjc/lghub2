@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#131330"/>
+      <stop offset="100%" stop-color="#07070f"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00c8ff" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#00c8ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="letterGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#40d8ff"/>
+      <stop offset="100%" stop-color="#0090c8"/>
+    </linearGradient>
+    <filter id="glowFilter" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="128" cy="128" r="120" fill="url(#bg)"/>
+
+  <!-- Outer ring -->
+  <circle cx="128" cy="128" r="118" fill="none" stroke="#00c8ff" stroke-width="1.5" stroke-opacity="0.35"/>
+
+  <!-- Glow halo -->
+  <circle cx="128" cy="128" r="90" fill="url(#glow)"/>
+
+  <!-- Inner accent ring -->
+  <circle cx="128" cy="128" r="96" fill="none" stroke="#00c8ff" stroke-width="0.75" stroke-opacity="0.2"/>
+
+  <!-- Letter G - outer arc (large arc, open right) -->
+  <path d="M 175 88
+             A 62 62 0 1 0 175 168"
+        fill="none"
+        stroke="url(#letterGrad)"
+        stroke-width="16"
+        stroke-linecap="round"
+        filter="url(#glowFilter)"/>
+
+  <!-- Letter G - horizontal crossbar -->
+  <line x1="128" y1="128" x2="175" y2="128"
+        stroke="url(#letterGrad)"
+        stroke-width="16"
+        stroke-linecap="round"
+        filter="url(#glowFilter)"/>
+
+  <!-- Dot accent at crossbar end -->
+  <circle cx="175" cy="128" r="5" fill="#00c8ff" opacity="0.9"/>
+
+  <!-- Small bottom-right corner notch accent -->
+  <circle cx="196" cy="196" r="14" fill="#0d0d1a" stroke="#00c8ff" stroke-width="1" stroke-opacity="0.4"/>
+  <text x="196" y="201" text-anchor="middle" font-family="'Rajdhani', sans-serif" font-size="13" font-weight="700" fill="#00c8ff" opacity="0.85">2</text>
+</svg>

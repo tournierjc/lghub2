@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=LGHUB2
+GenericName=Gaming Peripheral Manager
+Comment=Cross-platform reimplementation of Logitech G Hub
+Exec=lghub2 %U
+Icon=lghub2
+Terminal=false
+Type=Application
+Categories=Utility;Settings;
+Keywords=logitech;gaming;mouse;keyboard;macro;rgb;dpi;
+StartupNotify=true
+StartupWMClass=lghub2
