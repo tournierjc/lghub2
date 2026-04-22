@@ -29,7 +29,7 @@ npm ci
 
 ELECTRON_VER=$(electron --version | sed 's/^v//')
 echo "==> Rebuilding native modules for electron ${ELECTRON_VER}..."
-npx @electron/rebuild --version "$ELECTRON_VER"
+./node_modules/.bin/electron-rebuild --electronVersion "$ELECTRON_VER"
 
 npm run build
 npm prune --omit=dev

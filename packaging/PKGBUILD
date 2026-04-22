@@ -20,7 +20,7 @@ build() {
 
   local _electron_ver
   _electron_ver=$(electron --version | sed 's/^v//')
-  npx @electron/rebuild --version "$_electron_ver"
+  ./node_modules/.bin/electron-rebuild --electronVersion "$_electron_ver"
 
   npm run build
   npm prune --omit=dev
