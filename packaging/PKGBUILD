@@ -31,7 +31,6 @@ package() {
 
   install -dm755 "$pkgdir/usr/lib/$pkgname"
   cp -r dist    "$pkgdir/usr/lib/$pkgname/"
-  cp -r data    "$pkgdir/usr/lib/$pkgname/"
   cp -r assets  "$pkgdir/usr/lib/$pkgname/"
   cp -r node_modules "$pkgdir/usr/lib/$pkgname/"
 

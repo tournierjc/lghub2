@@ -38,7 +38,6 @@ echo "==> Installing to ${INSTALL_DIR}..."
 rm -rf "$INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
 cp -r dist         "$INSTALL_DIR/"
-cp -r data         "$INSTALL_DIR/"
 cp -r assets       "$INSTALL_DIR/"
 cp -r node_modules "$INSTALL_DIR/"
 
