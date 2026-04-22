@@ -1,16 +1,16 @@
-# Maintainer: see /home/jct/source/repos/lghub2
+# Maintainer: tournierjc <https://github.com/tournierjc>
 pkgname=lghub2
 pkgver=0.1.0
 pkgrel=1
 pkgdesc="Cross-platform reimplementation of Logitech G Hub"
 arch=('x86_64')
-url="https://github.com/lghub2/lghub2"
+url="https://github.com/tournierjc/lghub2"
 license=('custom:UNLICENSED')
 depends=('electron' 'libusb')
 makedepends=('nodejs>=22' 'npm' 'python' 'gcc')
 options=(!debug !strip)
 install="$pkgname.install"
-source=("$pkgname::git+file:///home/jct/source/repos/lghub2")
+source=("$pkgname::git+https://github.com/tournierjc/lghub2.git")
 sha256sums=('SKIP')
 
 build() {
