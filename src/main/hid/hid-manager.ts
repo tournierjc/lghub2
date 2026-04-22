@@ -48,10 +48,6 @@ export class HidManager extends EventEmitter {
       const connected: ConnectedDevice = { device, path: devicePath, info };
       this.connectedDevices.set(devicePath, connected);
 
-      device.on('data', (data: Buffer) => {
-        this.emit('device-data', devicePath, Array.from(data));
-      });
-
       device.on('error', (err: Error) => {
         console.error(`HID device error [${devicePath}]:`, err.message);
         this.disconnect(devicePath);

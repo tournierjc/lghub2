@@ -39,7 +39,6 @@ export function LightingEditor({ device, onLightingChange }: Props) {
 
   const handleEffectChange = (effect: LightingEffect) => {
     setSelectedEffect(effect);
-    setTimeout(emitChange, 0);
   };
 
   const handleColorInput = (channel: keyof RGBColor, value: number) => {
@@ -49,12 +48,10 @@ export function LightingEditor({ device, onLightingChange }: Props) {
 
   const handleSpeedChange = (value: number) => {
     setSpeed(value);
-    setTimeout(emitChange, 0);
   };
 
   const handleBrightnessChange = (value: number) => {
     setBrightness(value);
-    setTimeout(emitChange, 0);
   };
 
   const toggleZone = (zoneId: string) => {

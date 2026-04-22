@@ -11,7 +11,7 @@ import {
   DpiConfig,
   RGBColor,
 } from '../../shared/device-types';
-import { LOGITECH_VENDOR_ID, KNOWN_DEVICES } from '../../shared/hidpp-protocol';
+import { LOGITECH_VENDOR_ID, KNOWN_DEVICES, DEVICE_INDEX } from '../../shared/hidpp-protocol';
 
 export class DeviceService {
   private hidManager: HidManager;
@@ -49,7 +49,10 @@ export class DeviceService {
       }
 
       try {
-        const proto = await this.hidppService.discoverFeatures(hidDevice.path);
+        const connectionType = this.inferConnectionType(hidDevice);
+        // HID++ 2.0: wired USB devices use device index 0xFF; wireless slots use 0x01+
+        const deviceIndex = connectionType === ConnectionType.USB ? 0xff : DEVICE_INDEX.WIRELESS_1;
+        const proto = await this.hidppService.discoverFeatures(hidDevice.path, deviceIndex);
         const device = this.buildDeviceFromProtocol(hidDevice, proto);
         this.managedDevices.set(hidDevice.path, device);
         newDevices.push(device);
