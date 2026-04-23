@@ -103,14 +103,17 @@ export function registerIpcHandlers(window: BrowserWindow, hidManager: HidManage
   });
 
   ipcMain.handle(IpcChannel.APP_DATA_SEARCH, (_event, query: string) => {
-    const data = require('../data/applications.json') as { applications: Array<{ id: string; name: string; applicationId?: string; poster?: string }> };
+    const data = require('../data/applications.json') as { applications: Array<{ name: string; applicationId?: string; poster_url?: string }> };
     const q = query.toLowerCase();
-    return data.applications.filter((a) => a.name?.toLowerCase().includes(q)).slice(0, 20);
+    return data.applications
+      .filter((a) => a.name?.toLowerCase().includes(q))
+      .slice(0, 20)
+      .map((a) => ({ id: a.applicationId, name: a.name, applicationId: a.applicationId, poster: a.poster_url }));
   });
 
   ipcMain.handle(IpcChannel.APP_DATA_GET, (_event, appId: string) => {
-    const data = require('../data/applications.json') as { applications: Array<{ id: string; name: string; applicationId?: string }> };
-    return data.applications.find((a) => a.id === appId) || null;
+    const data = require('../data/applications.json') as { applications: Array<{ name: string; applicationId?: string }> };
+    return data.applications.find((a) => a.applicationId === appId) || null;
   });
 
   // Profile management
@@ -129,7 +132,8 @@ export function registerIpcHandlers(window: BrowserWindow, hidManager: HidManage
         profiles.find((p) => p.id === activeId) ||
         profiles.find((p) => p.isDefault) ||
         profiles[0];
-      device.activeProfile = { ...active };
+      const scannedDpi = device.activeProfile?.dpi;
+      device.activeProfile = { ...active, dpi: active.dpi ?? scannedDpi };
     }
 
     return profiles;

@@ -47,6 +47,10 @@ function createWindow(): void {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
 
+  mainWindow.once('ready-to-show', () => {
+    mainWindow?.show();
+  });
+
   mainWindow.on('close', (event) => {
     event.preventDefault();
     mainWindow?.hide();

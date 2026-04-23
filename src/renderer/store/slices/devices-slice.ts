@@ -33,7 +33,8 @@ export const refreshAllDevices = createAsyncThunk('devices/refreshAll', async ()
 export const setDeviceDpi = createAsyncThunk(
   'devices/setDpi',
   async ({ hidPath, dpi }: { hidPath: string; dpi: number }) => {
-    await window.device.setDpi(hidPath, dpi);
+    const ok = await window.device.setDpi(hidPath, dpi);
+    if (ok === false) throw new Error('setDpi failed on device');
     return { hidPath, dpi };
   }
 );
@@ -41,7 +42,8 @@ export const setDeviceDpi = createAsyncThunk(
 export const setDeviceRgb = createAsyncThunk(
   'devices/setRgb',
   async ({ hidPath, zoneIndex, r, g, b }: { hidPath: string; zoneIndex: number; r: number; g: number; b: number }) => {
-    await window.device.setRgb(hidPath, zoneIndex, r, g, b);
+    const ok = await window.device.setRgb(hidPath, zoneIndex, r, g, b);
+    if (ok === false) throw new Error('setRgb failed on device');
     return { hidPath, zoneIndex, r, g, b };
   }
 );
@@ -58,10 +60,11 @@ export const setDeviceRgbEffect = createAsyncThunk(
     speed: number;
     brightness: number;
   }) => {
-    await window.device.setRgbEffect(
+    const ok = await window.device.setRgbEffect(
       params.hidPath, params.zoneIndex, params.effectId,
       params.r, params.g, params.b, params.speed, params.brightness
     );
+    if (ok === false) throw new Error('setRgbEffect failed on device');
     return params;
   }
 );
@@ -195,11 +198,12 @@ const devicesSlice = createSlice({
         state.profiles[modelId] = profiles;
         const device = state.connected.find((d) => d.modelId === modelId);
         if (device && profiles.length > 0) {
+          const scannedDpi = device.activeProfile?.dpi;
           const active =
             profiles.find((p) => p.id === device.activeProfile?.id) ||
             profiles.find((p) => p.isDefault) ||
             profiles[0];
-          device.activeProfile = { ...active };
+          device.activeProfile = { ...active, dpi: active.dpi ?? scannedDpi };
         }
       })
       .addCase(createProfile.fulfilled, (state, action) => {
