@@ -133,7 +133,14 @@ export function registerIpcHandlers(window: BrowserWindow, hidManager: HidManage
         profiles.find((p) => p.isDefault) ||
         profiles[0];
       const scannedDpi = device.activeProfile?.dpi;
-      device.activeProfile = { ...active, dpi: active.dpi ?? scannedDpi };
+      const scannedLighting = device.activeProfile?.lighting;
+      const scannedAssignments = device.activeProfile?.assignments;
+      device.activeProfile = {
+        ...active,
+        dpi: active.dpi ?? scannedDpi,
+        lighting: active.lighting ?? scannedLighting,
+        assignments: active.assignments ?? scannedAssignments,
+      };
     }
 
     return profiles;

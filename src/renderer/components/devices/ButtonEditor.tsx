@@ -30,7 +30,7 @@ const DPI_ACTIONS = [
   { taskId: 0x00d7, label: 'DPI Up' },
   { taskId: 0x00d8, label: 'DPI Down' },
   { taskId: 0x00c2, label: 'DPI Cycle' },
-  { taskId: 0x00d6, label: 'Smart Shift' },
+  { taskId: 0x00d6, label: 'DPI Shift' },
   { taskId: 0x00d9, label: 'G-Shift' },
 ];
 
@@ -44,7 +44,7 @@ const MEDIA_ACTIONS = [
   { taskId: 0x00e6, label: 'Volume Down' },
 ];
 
-function assignmentLabel(assignment: ButtonAssignment | undefined, def: ButtonDef): string {
+function assignmentLabel(assignment: ButtonAssignment | undefined, def: ButtonDef, activeProfile: DeviceProfile): string {
   if (!assignment) return TASK_LABELS[def.defaultTaskId] || def.name;
   const a = assignment.action;
   if (a.type === 'disabled') return 'Disabled';
@@ -54,6 +54,7 @@ function assignmentLabel(assignment: ButtonAssignment | undefined, def: ButtonDe
     return mods + key;
   }
   if (a.type === 'media' || a.type === 'dpi' || a.type === 'system') {
+    if (a.type === 'dpi' && a.value === 0x00d6) return 'DPI Shift';
     return TASK_LABELS[a.value as number] || String(a.value);
   }
   return String(a.value);
@@ -91,7 +92,7 @@ export function ButtonEditor({ device, activeProfile, onApply }: Props) {
     setAssignments(buildAssignmentsFromDefs(defs, activeProfile.assignments));
     setDirty(false);
     setSelected(null);
-  }, [activeProfile.id]);
+  }, [defs, activeProfile.assignments]);
 
   const applyAction = useCallback((def: ButtonDef, assignment: ButtonAssignment) => {
     const hexKey = def.controlId.toString(16).padStart(4, '0');
@@ -159,15 +160,24 @@ export function ButtonEditor({ device, activeProfile, onApply }: Props) {
           const assignment = assignments[hexKey];
           const isSelected = selected?.controlId === def.controlId;
           return (
-            <div
+            <button
+              type="button"
               key={def.controlId}
               className={`button-editor__item ${isSelected ? 'button-editor__item--selected' : ''} ${!def.remappable ? 'button-editor__item--locked' : ''}`}
               onClick={() => def.remappable && setSelected(isSelected ? null : def)}
+              onKeyDown={(e) => {
+                if (!def.remappable) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelected(isSelected ? null : def);
+                }
+              }}
+              disabled={!def.remappable}
             >
               <span className="button-editor__item-name">{def.name}</span>
-              <span className="button-editor__item-action">{assignmentLabel(assignment, def)}</span>
+              <span className="button-editor__item-action">{assignmentLabel(assignment, def, activeProfile)}</span>
               {!def.remappable && <span className="button-editor__item-lock">🔒</span>}
-            </div>
+            </button>
           );
         })}
       </div>
@@ -179,6 +189,7 @@ export function ButtonEditor({ device, activeProfile, onApply }: Props) {
             <div className="button-editor__tabs">
               {(['mouse', 'keyboard', 'dpi', 'media', 'disabled'] as ActionTab[]).map((t) => (
                 <button
+                  type="button"
                   key={t}
                   className={`button-editor__tab ${tab === t ? 'button-editor__tab--active' : ''}`}
                   onClick={() => { setTab(t); setCapturing(false); setPendingKey(null); }}
@@ -192,7 +203,7 @@ export function ButtonEditor({ device, activeProfile, onApply }: Props) {
               {tab === 'mouse' && (
                 <div className="button-editor__action-grid">
                   {MOUSE_ACTIONS.map((a) => (
-                    <button key={a.taskId} className="button-editor__action-btn" onClick={() => handleMouseAction(selected, a.taskId)}>
+                    <button type="button" key={a.taskId} className="button-editor__action-btn" onClick={() => handleMouseAction(selected, a.taskId)}>
                       {a.label}
                     </button>
                   ))}
@@ -202,7 +213,7 @@ export function ButtonEditor({ device, activeProfile, onApply }: Props) {
               {tab === 'keyboard' && (
                 <div className="button-editor__key-capture">
                   {!capturing ? (
-                    <button className="button-editor__capture-btn" onClick={() => { setCapturing(true); setPendingKey(null); }}>
+                    <button type="button" className="button-editor__capture-btn" onClick={() => { setCapturing(true); setPendingKey(null); }}>
                       Click here, then press a key
                     </button>
                   ) : (
@@ -214,10 +225,10 @@ export function ButtonEditor({ device, activeProfile, onApply }: Props) {
                             {[...pendingKey.modifiers, pendingKey.key].join(' + ')}
                           </span>
                           <div className="button-editor__key-actions">
-                            <button className="button-editor__action-btn button-editor__action-btn--confirm" onClick={() => handleApplyKey(selected)}>
+                            <button type="button" className="button-editor__action-btn button-editor__action-btn--confirm" onClick={() => handleApplyKey(selected)}>
                               Assign
                             </button>
-                            <button className="button-editor__action-btn" onClick={() => { setCapturing(false); setPendingKey(null); }}>
+                            <button type="button" className="button-editor__action-btn" onClick={() => { setCapturing(false); setPendingKey(null); }}>
                               Cancel
                             </button>
                           </div>
@@ -231,7 +242,7 @@ export function ButtonEditor({ device, activeProfile, onApply }: Props) {
               {tab === 'dpi' && (
                 <div className="button-editor__action-grid">
                   {DPI_ACTIONS.map((a) => (
-                    <button key={a.taskId} className="button-editor__action-btn" onClick={() => handleDpiAction(selected, a.taskId)}>
+                    <button type="button" key={a.taskId} className="button-editor__action-btn" onClick={() => handleDpiAction(selected, a.taskId)}>
                       {a.label}
                     </button>
                   ))}
@@ -241,7 +252,7 @@ export function ButtonEditor({ device, activeProfile, onApply }: Props) {
               {tab === 'media' && (
                 <div className="button-editor__action-grid">
                   {MEDIA_ACTIONS.map((a) => (
-                    <button key={a.taskId} className="button-editor__action-btn" onClick={() => handleMediaAction(selected, a.taskId)}>
+                    <button type="button" key={a.taskId} className="button-editor__action-btn" onClick={() => handleMediaAction(selected, a.taskId)}>
                       {a.label}
                     </button>
                   ))}
@@ -250,7 +261,7 @@ export function ButtonEditor({ device, activeProfile, onApply }: Props) {
 
               {tab === 'disabled' && (
                 <div className="button-editor__action-grid">
-                  <button className="button-editor__action-btn button-editor__action-btn--danger" onClick={() => handleDisable(selected)}>
+                  <button type="button" className="button-editor__action-btn button-editor__action-btn--danger" onClick={() => handleDisable(selected)}>
                     Disable this button
                   </button>
                 </div>
@@ -266,7 +277,7 @@ export function ButtonEditor({ device, activeProfile, onApply }: Props) {
         {dirty && (
           <div className="button-editor__apply-bar">
             <span className="button-editor__unsaved">Unsaved changes</span>
-            <button className="button-editor__apply-btn" onClick={handleSave}>
+            <button type="button" className="button-editor__apply-btn" onClick={handleSave}>
               Apply
             </button>
           </div>

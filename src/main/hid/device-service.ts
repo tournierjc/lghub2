@@ -261,7 +261,9 @@ export class DeviceService {
     if (success) {
       const device = this.managedDevices.get(hidPath);
       if (device?.activeProfile.dpi) {
-        device.activeProfile.dpi.levels.forEach((l) => (l.isActive = false));
+        device.activeProfile.dpi.levels.forEach((l) => {
+          l.isActive = false;
+        });
         const level = device.activeProfile.dpi.levels.find((l) => l.dpi === dpi);
         if (level) level.isActive = true;
       }

@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { Device, DeviceProfile } from '../../../shared/device-types';
+import { Device, DeviceProfile, LightingConfig, LightingEffect } from '../../../shared/device-types';
 import { HidDeviceInfo } from '../../../shared/ipc-channels';
 
 export interface DevicesState {
@@ -68,6 +68,32 @@ export const setDeviceRgbEffect = createAsyncThunk(
     return params;
   }
 );
+
+function buildLightingConfigFromEffect(params: {
+  effectId: number;
+  r: number;
+  g: number;
+  b: number;
+  speed: number;
+  brightness: number;
+}): LightingConfig {
+  const effectById: Record<number, LightingEffect> = {
+    0x01: LightingEffect.SOLID,
+    0x03: LightingEffect.COLOR_CYCLE,
+    0x04: LightingEffect.WAVE,
+    0x05: LightingEffect.STARLIGHT,
+    0x07: LightingEffect.AUDIO_VISUALIZER,
+    0x0a: LightingEffect.BREATHING,
+    0x0b: LightingEffect.RIPPLE,
+  };
+
+  return {
+    effect: effectById[params.effectId] || LightingEffect.SOLID,
+    colors: [{ r: params.r, g: params.g, b: params.b }],
+    speed: params.speed,
+    brightness: params.brightness,
+  };
+}
 
 export const refreshBattery = createAsyncThunk(
   'devices/refreshBattery',
@@ -187,10 +213,37 @@ const devicesSlice = createSlice({
       .addCase(setDeviceDpi.fulfilled, (state, action) => {
         const device = state.connected.find((d) => d.hidPath === action.payload.hidPath);
         if (device?.activeProfile.dpi) {
-          device.activeProfile.dpi.levels.forEach((l) => (l.isActive = false));
+          device.activeProfile.dpi.levels.forEach((l) => {
+            l.isActive = false;
+          });
           const level = device.activeProfile.dpi.levels.find((l) => l.dpi === action.payload.dpi);
           if (level) level.isActive = true;
         }
+      })
+      .addCase(setDeviceRgb.fulfilled, (state, action) => {
+        const device = state.connected.find((d) => d.hidPath === action.payload.hidPath);
+        if (!device) return;
+
+        const nextLighting = [...(device.activeProfile.lighting || [])];
+        nextLighting[action.payload.zoneIndex] = {
+          effect: LightingEffect.SOLID,
+          colors: [{ r: action.payload.r, g: action.payload.g, b: action.payload.b }],
+          speed: nextLighting[action.payload.zoneIndex]?.speed ?? 50,
+          brightness: nextLighting[action.payload.zoneIndex]?.brightness ?? 100,
+          zones: device.lightingZones?.[action.payload.zoneIndex] ? [device.lightingZones[action.payload.zoneIndex].id] : undefined,
+        };
+        device.activeProfile.lighting = nextLighting;
+      })
+      .addCase(setDeviceRgbEffect.fulfilled, (state, action) => {
+        const device = state.connected.find((d) => d.hidPath === action.payload.hidPath);
+        if (!device) return;
+
+        const nextLighting = [...(device.activeProfile.lighting || [])];
+        nextLighting[action.payload.zoneIndex] = {
+          ...buildLightingConfigFromEffect(action.payload),
+          zones: device.lightingZones?.[action.payload.zoneIndex] ? [device.lightingZones[action.payload.zoneIndex].id] : undefined,
+        };
+        device.activeProfile.lighting = nextLighting;
       })
       .addCase(refreshBattery.fulfilled, (state, action) => {
         if (action.payload) {
@@ -233,7 +286,12 @@ const devicesSlice = createSlice({
         }
         const device = state.connected.find((d) => d.modelId === modelId);
         if (device && device.activeProfile?.id === profileId && profile) {
-          device.activeProfile = profile;
+          device.activeProfile = {
+            ...profile,
+            dpi: profile.dpi ?? device.activeProfile?.dpi,
+            lighting: profile.lighting ?? device.activeProfile?.lighting,
+            assignments: profile.assignments ?? device.activeProfile?.assignments,
+          };
         }
       })
       .addCase(deleteProfile.fulfilled, (state, action) => {

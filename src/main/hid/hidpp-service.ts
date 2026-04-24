@@ -365,6 +365,66 @@ export class HidppService extends EventEmitter {
     };
   }
 
+  private buildColorLedEffectPayload(effectId: number, r: number, g: number, b: number, speed: number, brightness: number): number[] {
+    const intensity = brightness === 100 ? 0 : Math.max(1, Math.min(100, brightness));
+    const speedBytes = [(speed >> 8) & 0xff, speed & 0xff];
+
+    const payload = new Array(11).fill(0);
+    payload[0] = effectId;
+
+    switch (effectId) {
+      case 0x01: // fixed
+        payload[1] = r & 0xff;
+        payload[2] = g & 0xff;
+        payload[3] = b & 0xff;
+        payload[4] = 0x00;
+        break;
+      case 0x03: // cycle
+        payload[6] = speedBytes[0];
+        payload[7] = speedBytes[1];
+        payload[8] = intensity;
+        break;
+      case 0x04: // wave
+        payload[6] = speedBytes[0];
+        payload[7] = speedBytes[1];
+        payload[8] = intensity;
+        break;
+      case 0x05: // starlight
+        payload[1] = r & 0xff;
+        payload[2] = g & 0xff;
+        payload[3] = b & 0xff;
+        payload[4] = r & 0xff;
+        payload[5] = g & 0xff;
+        payload[6] = b & 0xff;
+        break;
+      case 0x0a: // breathing
+        payload[1] = r & 0xff;
+        payload[2] = g & 0xff;
+        payload[3] = b & 0xff;
+        payload[4] = speedBytes[0];
+        payload[5] = speedBytes[1];
+        payload[6] = 0x00;
+        payload[7] = intensity;
+        break;
+      case 0x0b: // ripple
+        payload[1] = r & 0xff;
+        payload[2] = g & 0xff;
+        payload[3] = b & 0xff;
+        payload[5] = speedBytes[0];
+        payload[6] = speedBytes[1];
+        break;
+      default:
+        payload[0] = 0x01;
+        payload[1] = r & 0xff;
+        payload[2] = g & 0xff;
+        payload[3] = b & 0xff;
+        payload[4] = 0x01;
+        break;
+    }
+
+    return payload;
+  }
+
   setRgbZoneColor(devicePath: string, zoneIndex: number, r: number, g: number, b: number): boolean {
     const proto = this.deviceProtocols.get(devicePath);
     if (!proto) return false;
@@ -372,14 +432,12 @@ export class HidppService extends EventEmitter {
     const feature = proto.features.get(HidppFeature.RGB_EFFECTS);
     if (!feature) return false;
 
-    // SetRgbZoneSingleColor (function 0x01)
+    // Color LED Effects SetZoneEffect (function nibble 0x03)
     try {
-      this.sendRequest(devicePath, proto.deviceIndex, feature.featureIndex, 0x01, [
+      this.sendRequest(devicePath, proto.deviceIndex, feature.featureIndex, 0x03, [
         zoneIndex,
-        r & 0xff,
-        g & 0xff,
-        b & 0xff,
-        0x02, // persistence: RAM only
+        ...this.buildColorLedEffectPayload(0x01, r, g, b, 0, 100),
+        0x01,
       ]);
       return true;
     } catch {
@@ -403,20 +461,12 @@ export class HidppService extends EventEmitter {
     const feature = proto.features.get(HidppFeature.RGB_EFFECTS);
     if (!feature) return false;
 
-    // SetRgbZoneEffect (function 0x02) — LONG report needed
+    // Color LED Effects SetZoneEffect (function nibble 0x03) — LONG report needed
     try {
-      this.sendRequest(devicePath, proto.deviceIndex, feature.featureIndex, 0x02, [
+      this.sendRequest(devicePath, proto.deviceIndex, feature.featureIndex, 0x03, [
         zoneIndex,
-        effectId,
-        speed & 0xff,
-        (speed >> 8) & 0xff,
-        0x00,
-        r & 0xff,
-        g & 0xff,
-        b & 0xff,
-        brightness & 0xff,
-        0x02, // persistence: RAM only
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ...this.buildColorLedEffectPayload(effectId, r, g, b, speed, brightness),
+        0x01,
       ]);
       return true;
     } catch {

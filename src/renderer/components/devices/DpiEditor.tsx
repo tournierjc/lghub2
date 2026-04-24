@@ -4,9 +4,10 @@ import { Device, DpiLevel, RGBColor } from '../../../shared/device-types';
 interface Props {
   device: Device;
   onDpiChange: (dpi: number) => void;
+  onDpiLevelChange: (levelIndex: number, dpi: number) => void;
 }
 
-export function DpiEditor({ device, onDpiChange }: Props) {
+export function DpiEditor({ device, onDpiChange, onDpiLevelChange }: Props) {
   const dpiConfig = device.activeProfile.dpi;
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -28,7 +29,7 @@ export function DpiEditor({ device, onDpiChange }: Props) {
     if (editingIndex === null) return;
     const dpi = parseInt(editValue, 10);
     if (!isNaN(dpi) && dpi >= 100 && dpi <= 25600) {
-      onDpiChange(dpi);
+      onDpiLevelChange(editingIndex, dpi);
     }
     setEditingIndex(null);
   };
@@ -40,10 +41,17 @@ export function DpiEditor({ device, onDpiChange }: Props) {
       <h3 className="dpi-editor__title">DPI Levels</h3>
       <div className="dpi-editor__levels">
         {dpiConfig.levels.map((level, index) => (
-          <div
-            key={index}
+          <button
+            type="button"
+            key={`${level.dpi}-${level.color.r}-${level.color.g}-${level.color.b}`}
             className={`dpi-editor__level ${level.isActive ? 'dpi-editor__level--active' : ''}`}
             onClick={() => handleLevelClick(level, index)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleLevelClick(level, index);
+              }
+            }}
           >
             <div
               className="dpi-editor__level-indicator"
@@ -61,16 +69,17 @@ export function DpiEditor({ device, onDpiChange }: Props) {
                   min={100}
                   max={25600}
                   step={50}
-                  autoFocus
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
-                <span
+                <button
+                  type="button"
                   className="dpi-editor__level-value"
+                  onClick={(e) => e.stopPropagation()}
                   onDoubleClick={() => handleEditStart(index, level.dpi)}
                 >
                   {level.dpi}
-                </span>
+                </button>
               )}
               <span className="dpi-editor__level-label">DPI</span>
             </div>
@@ -81,14 +90,14 @@ export function DpiEditor({ device, onDpiChange }: Props) {
                 backgroundColor: rgbToCss(level.color),
               }}
             />
-          </div>
+          </button>
         ))}
       </div>
       <div className="dpi-editor__quick-actions">
-        <button className="dpi-editor__preset" onClick={() => onDpiChange(400)}>400</button>
-        <button className="dpi-editor__preset" onClick={() => onDpiChange(800)}>800</button>
-        <button className="dpi-editor__preset" onClick={() => onDpiChange(1600)}>1600</button>
-        <button className="dpi-editor__preset" onClick={() => onDpiChange(3200)}>3200</button>
+        <button type="button" className="dpi-editor__preset" onClick={() => onDpiChange(400)}>400</button>
+        <button type="button" className="dpi-editor__preset" onClick={() => onDpiChange(800)}>800</button>
+        <button type="button" className="dpi-editor__preset" onClick={() => onDpiChange(1600)}>1600</button>
+        <button type="button" className="dpi-editor__preset" onClick={() => onDpiChange(3200)}>3200</button>
       </div>
     </div>
   );

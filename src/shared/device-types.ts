@@ -85,6 +85,8 @@ export interface DeviceProfile {
   name: string;
   isDefault: boolean;
   applicationPath?: string;
+  applicationName?: string;
+  executableName?: string;
   dpi?: DpiConfig;
   lighting?: LightingConfig[];
   assignments?: Record<string, ButtonAssignment>;

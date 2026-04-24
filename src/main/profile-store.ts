@@ -62,6 +62,8 @@ export class ProfileStore {
       lighting: baseProfile?.lighting ? JSON.parse(JSON.stringify(baseProfile.lighting)) : undefined,
       assignments: baseProfile?.assignments ? JSON.parse(JSON.stringify(baseProfile.assignments)) : undefined,
       applicationPath: undefined,
+      applicationName: undefined,
+      executableName: undefined,
     };
 
     if (!this.data.devices[modelId]) {
@@ -90,6 +92,8 @@ export class ProfileStore {
     if (updates.lighting !== undefined) profile.lighting = updates.lighting;
     if (updates.assignments !== undefined) profile.assignments = updates.assignments;
     if ('applicationPath' in updates) profile.applicationPath = updates.applicationPath || undefined;
+    if ('applicationName' in updates) profile.applicationName = updates.applicationName || undefined;
+    if ('executableName' in updates) profile.executableName = updates.executableName || undefined;
 
     this.save();
     return profile;
@@ -152,7 +156,7 @@ export class ProfileStore {
   findProfileForApp(modelId: string, appId: string): DeviceProfile | null {
     const deviceData = this.data.devices[modelId];
     if (!deviceData) return null;
-    return deviceData.profiles.find((p) => p.applicationPath === appId) || null;
+    return deviceData.profiles.find((p) => p.executableName === appId || p.applicationPath === appId) || null;
   }
 
   importProfile(modelId: string, json: string): DeviceProfile | null {

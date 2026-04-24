@@ -24,15 +24,15 @@ function getAvailableTabs(device: Device): { id: DeviceTab; label: string }[] {
   return tabs;
 }
 
-const EFFECT_ID_MAP: Record<LightingEffect, number> = {
+const EFFECT_ID_MAP: Partial<Record<LightingEffect, number>> = {
   [LightingEffect.SOLID]: 0x01,
   [LightingEffect.COLOR_CYCLE]: 0x03,
-  [LightingEffect.BREATHING]: 0x0a,
   [LightingEffect.WAVE]: 0x04,
-  [LightingEffect.RIPPLE]: 0x05,
-  [LightingEffect.STARLIGHT]: 0x07,
-  [LightingEffect.SCREEN_SAMPLER]: 0x08,
-  [LightingEffect.AUDIO_VISUALIZER]: 0x09,
+  [LightingEffect.STARLIGHT]: 0x05,
+  [LightingEffect.BREATHING]: 0x0a,
+  [LightingEffect.RIPPLE]: 0x0b,
+  [LightingEffect.AUDIO_VISUALIZER]: 0x07,
+  [LightingEffect.SCREEN_SAMPLER]: 0x03,
 };
 
 interface AppEntry {
@@ -63,6 +63,7 @@ export function DevicePage() {
   const [appSearch, setAppSearch] = useState('');
   const [appResults, setAppResults] = useState<AppEntry[]>([]);
   const [appSearching, setAppSearching] = useState(false);
+  const [customBinaryName, setCustomBinaryName] = useState('');
 
   const tabs = device ? getAvailableTabs(device) : [];
   const activeProfile = profiles.find((p) => p.id === device?.activeProfile?.id) || device?.activeProfile;
@@ -71,19 +72,19 @@ export function DevicePage() {
     if (tabs.length > 0 && !tabs.find((t) => t.id === activeTab)) {
       setActiveTab(tabs[0].id);
     }
-  }, [device?.id]);
+  }, [tabs, activeTab]);
 
   useEffect(() => {
     if (device?.hasBattery) {
       dispatch(refreshBattery(device.hidPath));
     }
-  }, [device?.id]);
+  }, [device?.hasBattery, device?.hidPath, dispatch]);
 
   useEffect(() => {
     if (device) {
       dispatch(loadProfiles(device.modelId));
     }
-  }, [device?.modelId]);
+  }, [device, dispatch]);
 
   useEffect(() => {
     if (!profileMenuOpen) return;
@@ -96,29 +97,70 @@ export function DevicePage() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [profileMenuOpen]);
 
+  useEffect(() => {
+    setCustomBinaryName(activeProfile?.executableName || '');
+  }, [activeProfile?.executableName]);
+
   const handleDpiChange = useCallback((dpi: number) => {
     if (!device) return;
     dispatch(setDeviceDpi({ hidPath: device.hidPath, dpi }));
   }, [device, dispatch]);
 
+  const handleDpiLevelChange = useCallback((levelIndex: number, dpi: number) => {
+    if (!device || !activeProfile?.dpi) return;
+
+    const levels = activeProfile.dpi.levels.map((level, index) => (
+      index === levelIndex ? { ...level, dpi } : level
+    ));
+
+    dispatch(updateProfile({
+      modelId: device.modelId,
+      profileId: activeProfile.id,
+      updates: {
+        dpi: {
+          ...activeProfile.dpi,
+          levels,
+        },
+      },
+    }));
+  }, [device, activeProfile, dispatch]);
+
   const handleLightingChange = useCallback((config: LightingConfig) => {
-    if (!device) return;
-    const zoneIndex = 0;
-    if (config.effect === LightingEffect.SOLID) {
-      const c = config.colors[0] || { r: 0, g: 212, b: 255 };
-      dispatch(setDeviceRgb({ hidPath: device.hidPath, zoneIndex, r: c.r, g: c.g, b: c.b }));
-    } else {
-      const c = config.colors[0] || { r: 0, g: 212, b: 255 };
-      dispatch(setDeviceRgbEffect({
-        hidPath: device.hidPath,
-        zoneIndex,
-        effectId: EFFECT_ID_MAP[config.effect] || 0x01,
-        r: c.r, g: c.g, b: c.b,
-        speed: config.speed,
-        brightness: config.brightness,
-      }));
-    }
-  }, [device, dispatch]);
+    if (!device || !activeProfile) return;
+    const zoneIds = config.zones && config.zones.length > 0 ? config.zones : ['zone-0'];
+    const nextLighting = [...(activeProfile.lighting || [])];
+
+    zoneIds.forEach((zoneId) => {
+      const zoneIndex = device.lightingZones?.findIndex((zone) => zone.id === zoneId) ?? 0;
+      const targetZoneIndex = zoneIndex >= 0 ? zoneIndex : 0;
+      nextLighting[targetZoneIndex] = {
+        ...config,
+        zones: [zoneId],
+      };
+
+      if (config.effect === LightingEffect.SOLID) {
+        const c = config.colors[0] || { r: 0, g: 212, b: 255 };
+        dispatch(setDeviceRgb({ hidPath: device.hidPath, zoneIndex: targetZoneIndex, r: c.r, g: c.g, b: c.b }));
+      } else {
+        const c = config.colors[0] || { r: 0, g: 212, b: 255 };
+        const effectId = EFFECT_ID_MAP[config.effect] ?? EFFECT_ID_MAP[LightingEffect.SOLID] ?? 0x01;
+        dispatch(setDeviceRgbEffect({
+          hidPath: device.hidPath,
+          zoneIndex: targetZoneIndex,
+          effectId,
+          r: c.r, g: c.g, b: c.b,
+          speed: config.speed,
+          brightness: config.brightness,
+        }));
+      }
+    });
+
+    dispatch(updateProfile({
+      modelId: device.modelId,
+      profileId: activeProfile.id,
+      updates: { lighting: nextLighting },
+    }));
+  }, [device, activeProfile, dispatch]);
 
   const handleButtonApply = useCallback(async (assignments: Record<string, ButtonAssignment>) => {
     if (!device || !activeProfile) return;
@@ -187,19 +229,37 @@ export function DevicePage() {
     dispatch(updateProfile({
       modelId: device.modelId,
       profileId: activeProfile.id,
-      updates: { applicationPath: appId },
+      updates: { applicationPath: appId, applicationName: appName, executableName: '' },
     }));
     setAppSearch('');
     setAppResults([]);
+    setCustomBinaryName('');
   }, [device, activeProfile, dispatch]);
+
+  const handleAssignBinary = useCallback(() => {
+    const executableName = customBinaryName.trim();
+    if (!device || !activeProfile || !executableName) return;
+
+    dispatch(updateProfile({
+      modelId: device.modelId,
+      profileId: activeProfile.id,
+      updates: {
+        applicationPath: activeProfile.applicationPath || executableName,
+        applicationName: activeProfile.applicationName || executableName,
+        executableName,
+      },
+    }));
+    setCustomBinaryName(executableName);
+  }, [device, activeProfile, customBinaryName, dispatch]);
 
   const handleUnassignApp = useCallback(() => {
     if (!device || !activeProfile) return;
     dispatch(updateProfile({
       modelId: device.modelId,
       profileId: activeProfile.id,
-      updates: { applicationPath: '' },
+      updates: { applicationPath: '', applicationName: '', executableName: '' },
     }));
+    setCustomBinaryName('');
   }, [device, activeProfile, dispatch]);
 
   if (!device) {
@@ -233,6 +293,7 @@ export function DevicePage() {
       <div className="profile-bar">
         <div className="profile-bar__selector" ref={profileMenuRef}>
           <button
+            type="button"
             className="profile-bar__active"
             onClick={() => setProfileMenuOpen(!profileMenuOpen)}
           >
@@ -257,29 +318,31 @@ export function DevicePage() {
                         if (e.key === 'Escape') { setRenaming(null); setRenameValue(''); }
                       }}
                       onBlur={() => handleRenameProfile(p.id)}
-                      autoFocus
                     />
                   ) : (
-                    <button className="profile-bar__item-name" onClick={() => handleProfileSwitch(p.id)}>
+                    <button type="button" className="profile-bar__item-name" onClick={() => handleProfileSwitch(p.id)}>
                       {p.name}
                     </button>
                   )}
                   <div className="profile-bar__item-actions">
                     <button
+                      type="button"
                       className="profile-bar__item-btn"
                       title="Rename"
                       onClick={(e) => { e.stopPropagation(); setRenaming(p.id); setRenameValue(p.name); }}
                     >✎</button>
                     <button
+                      type="button"
                       className="profile-bar__item-btn"
                       title="Export"
                       onClick={(e) => { e.stopPropagation(); handleExportProfile(p.id); }}
                     >↗</button>
                     {!p.isDefault && (
-                      <button
-                        className="profile-bar__item-btn profile-bar__item-btn--danger"
-                        title="Delete"
-                        onClick={(e) => { e.stopPropagation(); handleDeleteProfile(p.id); }}
+                       <button
+                         type="button"
+                         className="profile-bar__item-btn profile-bar__item-btn--danger"
+                         title="Delete"
+                         onClick={(e) => { e.stopPropagation(); handleDeleteProfile(p.id); }}
                       >✕</button>
                     )}
                   </div>
@@ -298,14 +361,13 @@ export function DevicePage() {
                         if (e.key === 'Enter') handleCreateProfile();
                         if (e.key === 'Escape') { setCreating(false); setCreateName(''); }
                       }}
-                      autoFocus
                     />
-                    <button className="profile-bar__create-confirm" onClick={handleCreateProfile}>✓</button>
+                    <button type="button" className="profile-bar__create-confirm" onClick={handleCreateProfile}>✓</button>
                   </div>
                 ) : (
                   <div className="profile-bar__actions-row">
-                    <button className="profile-bar__add-btn" onClick={() => setCreating(true)}>+ New Profile</button>
-                    <button className="profile-bar__import-btn" onClick={handleImportProfile}>Import</button>
+                    <button type="button" className="profile-bar__add-btn" onClick={() => setCreating(true)}>+ New Profile</button>
+                    <button type="button" className="profile-bar__import-btn" onClick={handleImportProfile}>Import</button>
                   </div>
                 )}
               </div>
@@ -317,6 +379,7 @@ export function DevicePage() {
       <div className="device-page__tabs">
         {tabs.map((tab) => (
           <button
+            type="button"
             key={tab.id}
             className={`device-page__tab ${activeTab === tab.id ? 'device-page__tab--active' : ''}`}
             onClick={() => setActiveTab(tab.id)}
@@ -328,7 +391,7 @@ export function DevicePage() {
 
       <div className="device-page__content">
         {activeTab === 'dpi' && (
-          <DpiEditor device={device} onDpiChange={handleDpiChange} />
+          <DpiEditor device={device} onDpiChange={handleDpiChange} onDpiLevelChange={handleDpiLevelChange} />
         )}
         {activeTab === 'lighting' && (
           <LightingEditor device={device} onLightingChange={handleLightingChange} />
@@ -345,8 +408,11 @@ export function DevicePage() {
               <h3 className="app-profiles__label">Auto-switch for profile: {activeProfile?.name}</h3>
               {activeProfile?.applicationPath ? (
                 <div className="app-profiles__assigned">
-                  <span className="app-profiles__app-name">{activeProfile.applicationPath}</span>
-                  <button className="app-profiles__remove-btn" onClick={handleUnassignApp}>Remove</button>
+                  <span className="app-profiles__app-name">{activeProfile.applicationName || activeProfile.applicationPath}</span>
+                  {activeProfile.executableName && (
+                    <span className="app-profiles__app-name">Binary: {activeProfile.executableName}</span>
+                  )}
+                  <button type="button" className="app-profiles__remove-btn" onClick={handleUnassignApp}>Remove</button>
                 </div>
               ) : (
                 <p className="app-profiles__hint">
@@ -362,11 +428,12 @@ export function DevicePage() {
                 value={appSearch}
                 onChange={(e) => handleAppSearch(e.target.value)}
               />
-              {appSearching && <div className="app-profiles__searching">Searching…</div>}
-              {appResults.length > 0 && (
-                <div className="app-profiles__results">
+               {appSearching && <div className="app-profiles__searching">Searching…</div>}
+               {appResults.length > 0 && (
+                 <div className="app-profiles__results">
                   {appResults.map((app) => (
                     <button
+                      type="button"
                       key={app.id}
                       className="app-profiles__result"
                       onClick={() => handleAssignApp(app.id, app.name)}
@@ -374,11 +441,20 @@ export function DevicePage() {
                       <span className="app-profiles__result-name">{app.name}</span>
                     </button>
                   ))}
+                 </div>
+               )}
+               <div className="app-profiles__searching">
+                 <input
+                   className="app-profiles__search-input"
+                   placeholder="Binary name for auto-switch (e.g. firefox, cs2)"
+                   value={customBinaryName}
+                   onChange={(e) => setCustomBinaryName(e.target.value)}
+                 />
+                  <button type="button" className="app-profiles__result" onClick={handleAssignBinary}>Save Binary Name</button>
                 </div>
-              )}
-            </div>
-          </div>
-        )}
+             </div>
+           </div>
+         )}
       </div>
     </div>
   );
