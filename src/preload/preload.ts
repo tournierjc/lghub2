@@ -66,8 +66,8 @@ const profileApi = {
   import: (modelId: string) =>
     ipcRenderer.invoke(IpcChannel.PROFILE_IMPORT, modelId),
   onProfileSwitched: (callback: (modelId: string, profileId: string) => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, modelId: string, profileId: string) =>
-      callback(modelId, profileId);
+    const handler = (_event: Electron.IpcRendererEvent, payload: { modelId: string; profileId: string }) =>
+      callback(payload.modelId, payload.profileId);
     ipcRenderer.on(IpcChannel.APP_PROFILE_SWITCHED, handler);
     return () => ipcRenderer.removeListener(IpcChannel.APP_PROFILE_SWITCHED, handler);
   },

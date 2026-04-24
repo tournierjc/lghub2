@@ -153,7 +153,14 @@ const devicesSlice = createSlice({
       const device = state.connected.find((d) => d.modelId === modelId);
       if (device) {
         const profile = state.profiles[modelId]?.find((p) => p.id === profileId);
-        if (profile) device.activeProfile = profile;
+        if (profile) {
+          device.activeProfile = {
+            ...profile,
+            dpi: profile.dpi ?? device.activeProfile?.dpi,
+            lighting: profile.lighting ?? device.activeProfile?.lighting,
+            assignments: profile.assignments ?? device.activeProfile?.assignments,
+          };
+        }
       }
     },
   },
@@ -199,11 +206,18 @@ const devicesSlice = createSlice({
         const device = state.connected.find((d) => d.modelId === modelId);
         if (device && profiles.length > 0) {
           const scannedDpi = device.activeProfile?.dpi;
+          const scannedLighting = device.activeProfile?.lighting;
+          const scannedAssignments = device.activeProfile?.assignments;
           const active =
             profiles.find((p) => p.id === device.activeProfile?.id) ||
             profiles.find((p) => p.isDefault) ||
             profiles[0];
-          device.activeProfile = { ...active, dpi: active.dpi ?? scannedDpi };
+          device.activeProfile = {
+            ...active,
+            dpi: active.dpi ?? scannedDpi,
+            lighting: active.lighting ?? scannedLighting,
+            assignments: active.assignments ?? scannedAssignments,
+          };
         }
       })
       .addCase(createProfile.fulfilled, (state, action) => {
@@ -217,11 +231,28 @@ const devicesSlice = createSlice({
           const idx = state.profiles[modelId].findIndex((p) => p.id === profileId);
           if (idx >= 0) state.profiles[modelId][idx] = profile;
         }
+        const device = state.connected.find((d) => d.modelId === modelId);
+        if (device && device.activeProfile?.id === profileId && profile) {
+          device.activeProfile = profile;
+        }
       })
       .addCase(deleteProfile.fulfilled, (state, action) => {
         const { modelId, profileId } = action.payload;
         if (state.profiles[modelId]) {
           state.profiles[modelId] = state.profiles[modelId].filter((p) => p.id !== profileId);
+        }
+        const device = state.connected.find((d) => d.modelId === modelId);
+        if (device && device.activeProfile?.id === profileId) {
+          const remaining = state.profiles[modelId];
+          const newActive = remaining?.find((p) => p.isDefault) || remaining?.[0];
+          if (newActive) {
+            device.activeProfile = {
+              ...newActive,
+              dpi: newActive.dpi ?? device.activeProfile?.dpi,
+              lighting: newActive.lighting ?? device.activeProfile?.lighting,
+              assignments: newActive.assignments ?? device.activeProfile?.assignments,
+            };
+          }
         }
       })
       .addCase(setActiveProfile.fulfilled, (state, action) => {
@@ -230,7 +261,14 @@ const devicesSlice = createSlice({
         if (device) {
           const profiles = state.profiles[modelId];
           const profile = profiles?.find((p) => p.id === profileId);
-          if (profile) device.activeProfile = profile;
+          if (profile) {
+            device.activeProfile = {
+              ...profile,
+              dpi: profile.dpi ?? device.activeProfile?.dpi,
+              lighting: profile.lighting ?? device.activeProfile?.lighting,
+              assignments: profile.assignments ?? device.activeProfile?.assignments,
+            };
+          }
         }
       })
       .addCase(importProfile.fulfilled, (state, action) => {
