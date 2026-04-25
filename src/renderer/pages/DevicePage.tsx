@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../hooks/use-store';
 import {
   setDeviceDpi, setDeviceRgb, setDeviceRgbEffect, refreshBattery,
@@ -10,7 +10,8 @@ import { LightingEditor } from '../components/devices/LightingEditor';
 import { ButtonEditor } from '../components/devices/ButtonEditor';
 import { EqEditor } from '../components/devices/EqEditor';
 import { DeviceImage } from '../components/devices/DeviceImage';
-import { Device, DeviceProfile, LightingConfig, LightingEffect, ButtonAssignment } from '../../shared/device-types';
+import { LightingEffect } from '../../shared/device-types';
+import type { Device, DeviceProfile, LightingConfig, ButtonAssignment } from '../../shared/device-types';
 
 type DeviceTab = 'dpi' | 'lighting' | 'assignments' | 'equalizer' | 'apps';
 
@@ -36,10 +37,11 @@ const EFFECT_ID_MAP: Partial<Record<LightingEffect, number>> = {
 };
 
 interface AppEntry {
-  id: string;
+  id?: string;
   name: string;
   applicationId?: string;
   poster?: string;
+  detectionExecutables?: string[];
 }
 
 export function DevicePage() {
@@ -224,12 +226,19 @@ export function DevicePage() {
     setAppSearching(false);
   }, []);
 
-  const handleAssignApp = useCallback((appId: string, appName: string) => {
+  const handleAssignApp = useCallback((app: AppEntry) => {
     if (!device || !activeProfile) return;
+
+    const applicationPath = app.applicationId || app.id || app.name;
     dispatch(updateProfile({
       modelId: device.modelId,
       profileId: activeProfile.id,
-      updates: { applicationPath: appId, applicationName: appName, executableName: '' },
+      updates: {
+        applicationPath,
+        applicationName: app.name,
+        executableName: '',
+        detectionExecutables: app.detectionExecutables || [],
+      },
     }));
     setAppSearch('');
     setAppResults([]);
@@ -257,7 +266,7 @@ export function DevicePage() {
     dispatch(updateProfile({
       modelId: device.modelId,
       profileId: activeProfile.id,
-      updates: { applicationPath: '', applicationName: '', executableName: '' },
+      updates: { applicationPath: '', applicationName: '', executableName: '', detectionExecutables: [] },
     }));
     setCustomBinaryName('');
   }, [device, activeProfile, dispatch]);
@@ -434,9 +443,9 @@ export function DevicePage() {
                   {appResults.map((app) => (
                     <button
                       type="button"
-                      key={app.id}
+                      key={app.applicationId || app.id || app.name}
                       className="app-profiles__result"
-                      onClick={() => handleAssignApp(app.id, app.name)}
+                      onClick={() => handleAssignApp(app)}
                     >
                       <span className="app-profiles__result-name">{app.name}</span>
                     </button>

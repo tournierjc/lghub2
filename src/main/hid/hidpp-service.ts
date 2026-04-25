@@ -10,9 +10,30 @@ import {
   isHidppError,
   DEVICE_INDEX,
 } from '../../shared/hidpp-protocol';
+import { DeviceProfile, DpiConfig } from '../../shared/device-types';
 
 const SOFTWARE_ID = 0x07;
 const FEATURE_DISCOVERY_TIMEOUT_MS = 2000;
+const ONBOARD_PROFILE_DIRECTORY_ADDRESS = 0x0000;
+const ONBOARD_PROFILE_DIRECTORY_ENTRY_SIZE = 4;
+const ONBOARD_PROFILE_DPI_SLOT_COUNT = 5;
+const ONBOARD_PROFILE_DISABLED_DPI = 0xffff;
+const ONBOARD_PROFILE_DEFAULT_DPI_OFFSET = 1;
+const ONBOARD_PROFILE_SWITCHED_DPI_OFFSET = 2;
+const ONBOARD_PROFILE_CURRENT_DPI_OFFSET = 3;
+const ONBOARD_PROFILE_DPI_LIST_OFFSET = 4;
+const ONBOARD_PROFILE_MEMORY_CHUNK_SIZE = 16;
+
+const OnboardProfileOpcode = {
+  GET_PROFILES_DESCR: 0x00,
+  GET_CURRENT_PROFILE: 0x40,
+  MEMORY_READ: 0x50,
+  MEMORY_ADDR_WRITE: 0x60,
+  MEMORY_WRITE: 0x70,
+  MEMORY_WRITE_END: 0x80,
+  GET_CURRENT_DPI_INDEX: 0xb0,
+  SET_CURRENT_DPI_INDEX: 0xc0,
+} as const;
 
 interface FeatureMapping {
   featureId: HidppFeature;
@@ -25,6 +46,17 @@ interface DeviceProtocolInfo {
   features: Map<HidppFeature, FeatureMapping>;
   protocolMajor: number;
   protocolMinor: number;
+}
+
+interface OnboardProfilesDescriptor {
+  profileCount: number;
+  sectorSize: number;
+  effectiveSectorSize: number;
+}
+
+interface OnboardProfilesFeatureContext {
+  deviceIndex: number;
+  featureIndex: number;
 }
 
 export class HidppService extends EventEmitter {
@@ -344,6 +376,315 @@ export class HidppService extends EventEmitter {
     } catch {
       return false;
     }
+  }
+
+  syncActiveProfileDpiToHardware(devicePath: string, profile: DeviceProfile): boolean {
+    const dpiConfig = profile.dpi;
+    if (!dpiConfig || dpiConfig.levels.length === 0) return false;
+
+    const featureContext = this.getOnboardProfilesFeatureContext(devicePath);
+    if (!featureContext) return false;
+
+    try {
+      const descriptor = this.getOnboardProfilesDescriptor(devicePath, featureContext);
+      if (!descriptor) return false;
+
+      const activeProfileIndex = this.getCurrentOnboardProfileIndex(devicePath, featureContext, descriptor.profileCount);
+      if (activeProfileIndex === null) return false;
+
+      const directorySector = this.readOnboardMemory(
+        devicePath,
+        featureContext,
+        ONBOARD_PROFILE_DIRECTORY_ADDRESS,
+        descriptor.effectiveSectorSize,
+      );
+
+      const activeProfileSectorAddress = this.resolveActiveProfileSectorAddress(
+        directorySector,
+        descriptor.profileCount,
+        activeProfileIndex,
+      );
+      if (activeProfileSectorAddress === null) return false;
+
+      const activeProfileSector = this.readOnboardMemory(
+        devicePath,
+        featureContext,
+        activeProfileSectorAddress,
+        descriptor.effectiveSectorSize,
+      );
+
+      const nextSector = this.patchActiveProfileDpiSector(activeProfileSector, descriptor.effectiveSectorSize, dpiConfig);
+      this.writeOnboardMemory(devicePath, featureContext, activeProfileSectorAddress, nextSector);
+
+      const desiredDpiIndex = this.resolveActiveDpiSlotIndex(
+        dpiConfig,
+        Math.min(dpiConfig.levels.length, ONBOARD_PROFILE_DPI_SLOT_COUNT),
+      );
+      const currentDpiIndex = this.getCurrentOnboardDpiIndex(devicePath, featureContext);
+      if (currentDpiIndex !== desiredDpiIndex) {
+        this.setCurrentOnboardDpiIndex(devicePath, featureContext, desiredDpiIndex);
+      }
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private getOnboardProfilesFeatureContext(devicePath: string): OnboardProfilesFeatureContext | null {
+    const proto = this.deviceProtocols.get(devicePath);
+    if (!proto) return null;
+
+    const feature = proto.features.get(HidppFeature.ONBOARD_PROFILES);
+    if (!feature) return null;
+
+    return {
+      deviceIndex: proto.deviceIndex,
+      featureIndex: feature.featureIndex,
+    };
+  }
+
+  private sendOnboardProfilesRequest(
+    devicePath: string,
+    context: OnboardProfilesFeatureContext,
+    opcode: number,
+    params: number[] = [],
+  ): number[] | null {
+    return this.sendRequest(
+      devicePath,
+      context.deviceIndex,
+      context.featureIndex,
+      opcode >> 4,
+      params,
+    );
+  }
+
+  private getOnboardProfilesDescriptor(
+    devicePath: string,
+    context: OnboardProfilesFeatureContext,
+  ): OnboardProfilesDescriptor | null {
+    const response = this.sendOnboardProfilesRequest(devicePath, context, OnboardProfileOpcode.GET_PROFILES_DESCR);
+    if (!response) return null;
+
+    const parsed = parseHidppMessage(response);
+    if (!parsed) return null;
+
+    const profileCount = parsed.params[3] || 0;
+    const sectorSize = ((parsed.params[7] ?? 0) << 8) | (parsed.params[8] ?? 0);
+    if (profileCount <= 0 || sectorSize <= 0) return null;
+
+    return {
+      profileCount,
+      sectorSize,
+      effectiveSectorSize: sectorSize === 0xff ? 0x100 : sectorSize,
+    };
+  }
+
+  private getCurrentOnboardProfileIndex(
+    devicePath: string,
+    context: OnboardProfilesFeatureContext,
+    profileCount: number,
+  ): number | null {
+    const response = this.sendOnboardProfilesRequest(devicePath, context, OnboardProfileOpcode.GET_CURRENT_PROFILE);
+    if (!response) return null;
+
+    const parsed = parseHidppMessage(response);
+    if (!parsed) return null;
+
+    const activeProfileIndex = parsed.params[1];
+    if (activeProfileIndex !== undefined) {
+      if (activeProfileIndex >= 1 && activeProfileIndex <= profileCount) {
+        return activeProfileIndex - 1;
+      }
+
+      if (activeProfileIndex >= 0 && activeProfileIndex < profileCount) {
+        return activeProfileIndex;
+      }
+    }
+
+    const fallbackProfileIndex = parsed.params[0];
+    if (fallbackProfileIndex !== undefined && fallbackProfileIndex >= 0 && fallbackProfileIndex < profileCount) {
+      return fallbackProfileIndex;
+    }
+
+    return null;
+  }
+
+  private getCurrentOnboardDpiIndex(devicePath: string, context: OnboardProfilesFeatureContext): number | null {
+    const response = this.sendOnboardProfilesRequest(devicePath, context, OnboardProfileOpcode.GET_CURRENT_DPI_INDEX);
+    if (!response) return null;
+
+    const parsed = parseHidppMessage(response);
+    if (!parsed) return null;
+
+    return parsed.params[0] ?? null;
+  }
+
+  private setCurrentOnboardDpiIndex(devicePath: string, context: OnboardProfilesFeatureContext, dpiIndex: number): void {
+    this.sendOnboardProfilesRequest(devicePath, context, OnboardProfileOpcode.SET_CURRENT_DPI_INDEX, [dpiIndex & 0xff]);
+  }
+
+  private readOnboardMemory(
+    devicePath: string,
+    context: OnboardProfilesFeatureContext,
+    sectorAddress: number,
+    length: number,
+  ): Uint8Array {
+    const buffer = new Uint8Array(length);
+
+    for (let offset = 0; offset < length; offset += ONBOARD_PROFILE_MEMORY_CHUNK_SIZE) {
+      const remainingBytes = length - offset;
+      const isFinalPartialChunk = remainingBytes < ONBOARD_PROFILE_MEMORY_CHUNK_SIZE && offset > 0;
+      const chunkOffset = isFinalPartialChunk ? length - ONBOARD_PROFILE_MEMORY_CHUNK_SIZE : offset;
+      const response = this.sendOnboardProfilesRequest(devicePath, context, OnboardProfileOpcode.MEMORY_READ, [
+        (sectorAddress >> 8) & 0xff,
+        sectorAddress & 0xff,
+        (chunkOffset >> 8) & 0xff,
+        chunkOffset & 0xff,
+      ]);
+      if (!response) {
+        throw new Error('Failed to read onboard profile memory');
+      }
+
+      const parsed = parseHidppMessage(response);
+      if (!parsed || parsed.params.length < ONBOARD_PROFILE_MEMORY_CHUNK_SIZE) {
+        throw new Error('Invalid onboard profile memory read response');
+      }
+
+      if (isFinalPartialChunk) {
+        const partialStart = ONBOARD_PROFILE_MEMORY_CHUNK_SIZE - remainingBytes;
+        buffer.set(parsed.params.slice(partialStart, ONBOARD_PROFILE_MEMORY_CHUNK_SIZE), offset);
+        continue;
+      }
+
+      buffer.set(parsed.params.slice(0, Math.min(ONBOARD_PROFILE_MEMORY_CHUNK_SIZE, remainingBytes)), offset);
+    }
+
+    return buffer;
+  }
+
+  private writeOnboardMemory(
+    devicePath: string,
+    context: OnboardProfilesFeatureContext,
+    sectorAddress: number,
+    data: Uint8Array,
+  ): void {
+    this.sendOnboardProfilesRequest(devicePath, context, OnboardProfileOpcode.MEMORY_ADDR_WRITE, [
+      (sectorAddress >> 8) & 0xff,
+      sectorAddress & 0xff,
+      0x00,
+      0x00,
+    ]);
+
+    for (let offset = 0; offset < data.length; offset += ONBOARD_PROFILE_MEMORY_CHUNK_SIZE) {
+      const chunk = data.subarray(offset, offset + ONBOARD_PROFILE_MEMORY_CHUNK_SIZE);
+      if (chunk.length !== ONBOARD_PROFILE_MEMORY_CHUNK_SIZE) {
+        throw new Error('Onboard profile sector write must use 16-byte chunks');
+      }
+
+      this.sendOnboardProfilesRequest(devicePath, context, OnboardProfileOpcode.MEMORY_WRITE, Array.from(chunk));
+    }
+
+    this.sendOnboardProfilesRequest(devicePath, context, OnboardProfileOpcode.MEMORY_WRITE_END);
+  }
+
+  private resolveActiveProfileSectorAddress(
+    directorySector: Uint8Array,
+    profileCount: number,
+    activeProfileIndex: number,
+  ): number | null {
+    const profileSectorAddresses: number[] = [];
+
+    for (
+      let offset = 0;
+      offset + ONBOARD_PROFILE_DIRECTORY_ENTRY_SIZE <= directorySector.length && profileSectorAddresses.length < profileCount;
+      offset += ONBOARD_PROFILE_DIRECTORY_ENTRY_SIZE
+    ) {
+      const sectorAddress = (directorySector[offset] << 8) | directorySector[offset + 1];
+      if (sectorAddress === 0xffff) break;
+      profileSectorAddresses.push(sectorAddress);
+    }
+
+    return profileSectorAddresses[activeProfileIndex] ?? null;
+  }
+
+  private patchActiveProfileDpiSector(
+    sector: Uint8Array,
+    sectorSize: number,
+    dpiConfig: DpiConfig,
+  ): Uint8Array {
+    const nextSector = new Uint8Array(sector);
+    const levelValues = dpiConfig.levels
+      .slice(0, ONBOARD_PROFILE_DPI_SLOT_COUNT)
+      .map((level) => this.normalizeDpiValue(level.dpi));
+    const slotCount = levelValues.length;
+    const activeIndex = this.resolveActiveDpiSlotIndex(dpiConfig, slotCount);
+    const defaultIndex = this.resolveDefaultDpiSlotIndex(dpiConfig, activeIndex, slotCount);
+    const switchedIndex = this.normalizeDpiSlotIndex(nextSector[ONBOARD_PROFILE_SWITCHED_DPI_OFFSET], slotCount, activeIndex);
+
+    nextSector[ONBOARD_PROFILE_DEFAULT_DPI_OFFSET] = defaultIndex;
+    nextSector[ONBOARD_PROFILE_SWITCHED_DPI_OFFSET] = switchedIndex;
+    nextSector[ONBOARD_PROFILE_CURRENT_DPI_OFFSET] = activeIndex;
+
+    for (let index = 0; index < ONBOARD_PROFILE_DPI_SLOT_COUNT; index++) {
+      const dpi = levelValues[index] ?? ONBOARD_PROFILE_DISABLED_DPI;
+      const dpiOffset = ONBOARD_PROFILE_DPI_LIST_OFFSET + (index * 2);
+      nextSector[dpiOffset] = dpi & 0xff;
+      nextSector[dpiOffset + 1] = (dpi >> 8) & 0xff;
+    }
+
+    const crc = this.computeLogitechCrcCcitt(nextSector.subarray(0, sectorSize - 2));
+    nextSector[sectorSize - 2] = (crc >> 8) & 0xff;
+    nextSector[sectorSize - 1] = crc & 0xff;
+    return nextSector;
+  }
+
+  private resolveDefaultDpiSlotIndex(dpiConfig: DpiConfig, fallbackIndex: number, slotCount: number): number {
+    const configuredDefaultIndex = dpiConfig.levels.findIndex((level) => level.dpi === dpiConfig.defaultDpi);
+    return this.normalizeDpiSlotIndex(configuredDefaultIndex, slotCount, fallbackIndex);
+  }
+
+  private resolveActiveDpiSlotIndex(dpiConfig: DpiConfig, slotCount: number): number {
+    const activeLevelIndex = dpiConfig.levels
+      .slice(0, ONBOARD_PROFILE_DPI_SLOT_COUNT)
+      .findIndex((level) => level.isActive);
+
+    if (activeLevelIndex >= 0) {
+      return this.normalizeDpiSlotIndex(activeLevelIndex, slotCount);
+    }
+
+    return this.normalizeDpiSlotIndex(dpiConfig.activeLevelIndex, slotCount);
+  }
+
+  private normalizeDpiSlotIndex(index: number | undefined, slotCount: number, fallbackIndex: number = 0): number {
+    if (slotCount <= 0) return 0;
+    if (index !== undefined && index >= 0 && index < slotCount) {
+      return index;
+    }
+    return Math.max(0, Math.min(slotCount - 1, fallbackIndex));
+  }
+
+  private normalizeDpiValue(dpi: number): number {
+    const normalized = Math.trunc(dpi);
+    if (normalized < 0) return 0;
+    if (normalized > 0xffff) return 0xffff;
+    return normalized;
+  }
+
+  private computeLogitechCrcCcitt(data: Uint8Array): number {
+    let crc = 0xffff;
+
+    for (const byte of data) {
+      const temp = (crc >> 8) ^ byte;
+      crc = (crc << 8) & 0xffff;
+      const quick = temp ^ (temp >> 4);
+      crc ^= quick;
+      crc ^= (quick << 5) & 0xffff;
+      crc ^= (quick << 7) & 0xffff;
+      crc &= 0xffff;
+    }
+
+    return crc;
   }
 
   getRgbEffectInfo(devicePath: string): { zoneCount: number } | null {

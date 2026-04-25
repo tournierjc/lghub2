@@ -1,6 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IpcChannel } from '../shared/ipc-channels';
 
+export interface AppDataEntry {
+  id?: string;
+  name: string;
+  applicationId?: string;
+  poster?: string;
+  detectionExecutables?: string[];
+}
+
 const electronApi = {
   minimize: () => ipcRenderer.send(IpcChannel.MINIMIZE),
   maximize: () => ipcRenderer.send(IpcChannel.MAXIMIZE),
@@ -79,8 +87,8 @@ const storeApi = {
 };
 
 const appDataApi = {
-  search: (query: string) => ipcRenderer.invoke(IpcChannel.APP_DATA_SEARCH, query),
-  get: (appId: string) => ipcRenderer.invoke(IpcChannel.APP_DATA_GET, appId),
+  search: (query: string) => ipcRenderer.invoke(IpcChannel.APP_DATA_SEARCH, query) as Promise<AppDataEntry[]>,
+  get: (appId: string) => ipcRenderer.invoke(IpcChannel.APP_DATA_GET, appId) as Promise<(AppDataEntry & Record<string, unknown>) | null>,
 };
 
 contextBridge.exposeInMainWorld('electron', electronApi);

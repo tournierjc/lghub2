@@ -8,6 +8,18 @@ import { DeviceService } from './hid/device-service';
 import { ProfileStore } from './profile-store';
 import { MarketplaceService } from './marketplace-service';
 import { DeviceProfile } from '../shared/device-types';
+import { extractDetectionExecutables } from './app-detection';
+
+interface CatalogApplication {
+  name: string;
+  applicationId?: string;
+  poster_url?: string;
+  detection?: unknown;
+}
+
+interface CatalogApplicationData {
+  applications: CatalogApplication[];
+}
 
 export function registerIpcHandlers(window: BrowserWindow, hidManager: HidManager, deviceService: DeviceService, profileStore: ProfileStore, marketplaceService: MarketplaceService): void {
   // Window management
@@ -103,17 +115,24 @@ export function registerIpcHandlers(window: BrowserWindow, hidManager: HidManage
   });
 
   ipcMain.handle(IpcChannel.APP_DATA_SEARCH, (_event, query: string) => {
-    const data = require('../data/applications.json') as { applications: Array<{ name: string; applicationId?: string; poster_url?: string }> };
+    const data = require('../data/applications.json') as CatalogApplicationData;
     const q = query.toLowerCase();
     return data.applications
       .filter((a) => a.name?.toLowerCase().includes(q))
       .slice(0, 20)
-      .map((a) => ({ id: a.applicationId, name: a.name, applicationId: a.applicationId, poster: a.poster_url }));
+      .map((a) => ({
+        id: a.applicationId,
+        name: a.name,
+        applicationId: a.applicationId,
+        poster: a.poster_url,
+        detectionExecutables: extractDetectionExecutables(a.detection),
+      }));
   });
 
   ipcMain.handle(IpcChannel.APP_DATA_GET, (_event, appId: string) => {
-    const data = require('../data/applications.json') as { applications: Array<{ name: string; applicationId?: string }> };
-    return data.applications.find((a) => a.applicationId === appId) || null;
+    const data = require('../data/applications.json') as CatalogApplicationData;
+    const application = data.applications.find((a) => a.applicationId === appId);
+    return application ? { ...application, detectionExecutables: extractDetectionExecutables(application.detection) } : null;
   });
 
   // Profile management
@@ -153,7 +172,16 @@ export function registerIpcHandlers(window: BrowserWindow, hidManager: HidManage
 
   ipcMain.handle(IpcChannel.PROFILE_UPDATE, (_event, modelId: string, profileId: string, updatesJson: string) => {
     const updates = JSON.parse(updatesJson) as Partial<DeviceProfile>;
-    return profileStore.updateProfile(modelId, profileId, updates);
+    const profile = profileStore.updateProfile(modelId, profileId, updates);
+
+    if (profile && updates.dpi !== undefined) {
+      const device = deviceService.getAllDevices().find((d) => d.modelId === modelId);
+      if (device?.activeProfile?.id === profileId) {
+        deviceService.syncActiveProfileDpiToHardware(device.hidPath, profile);
+      }
+    }
+
+    return profile;
   });
 
   ipcMain.handle(IpcChannel.PROFILE_DELETE, (_event, modelId: string, profileId: string) => {
@@ -161,7 +189,18 @@ export function registerIpcHandlers(window: BrowserWindow, hidManager: HidManage
   });
 
   ipcMain.handle(IpcChannel.PROFILE_SET_ACTIVE, (_event, modelId: string, profileId: string) => {
-    return profileStore.setActiveProfile(modelId, profileId);
+    const success = profileStore.setActiveProfile(modelId, profileId);
+    if (!success) return false;
+
+    const device = deviceService.getAllDevices().find((d) => d.modelId === modelId);
+    const profile = profileStore.getProfiles(modelId).find((candidate) => candidate.id === profileId);
+
+    if (device && profile) {
+      deviceService.activateProfile(device.hidPath, profile);
+      deviceService.syncActiveProfileDpiToHardware(device.hidPath, profile);
+    }
+
+    return true;
   });
 
   ipcMain.handle(IpcChannel.PROFILE_EXPORT, async (_event, modelId: string, profileId: string) => {

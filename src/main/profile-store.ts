@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
 import { v4 as uuidv4 } from 'uuid';
-import { DeviceProfile, DpiConfig, LightingConfig, ButtonAssignment, EqPreset } from '../shared/device-types';
+import { DeviceProfile } from '../shared/device-types';
+import { normalizeProcessName } from './app-detection';
 
 interface ProfileStoreData {
   version: number;
@@ -64,6 +65,7 @@ export class ProfileStore {
       applicationPath: undefined,
       applicationName: undefined,
       executableName: undefined,
+      detectionExecutables: undefined,
     };
 
     if (!this.data.devices[modelId]) {
@@ -94,6 +96,11 @@ export class ProfileStore {
     if ('applicationPath' in updates) profile.applicationPath = updates.applicationPath || undefined;
     if ('applicationName' in updates) profile.applicationName = updates.applicationName || undefined;
     if ('executableName' in updates) profile.executableName = updates.executableName || undefined;
+    if ('detectionExecutables' in updates) {
+      profile.detectionExecutables = updates.detectionExecutables && updates.detectionExecutables.length > 0
+        ? [...updates.detectionExecutables]
+        : undefined;
+    }
 
     this.save();
     return profile;
@@ -156,7 +163,17 @@ export class ProfileStore {
   findProfileForApp(modelId: string, appId: string): DeviceProfile | null {
     const deviceData = this.data.devices[modelId];
     if (!deviceData) return null;
-    return deviceData.profiles.find((p) => p.executableName === appId || p.applicationPath === appId) || null;
+
+    const normalizedAppId = normalizeProcessName(appId);
+    return deviceData.profiles.find((profile) => {
+      const candidates = [
+        profile.executableName,
+        profile.applicationPath,
+        ...(profile.detectionExecutables || []),
+      ];
+
+      return candidates.some((candidate) => candidate && normalizeProcessName(candidate) === normalizedAppId);
+    }) || null;
   }
 
   importProfile(modelId: string, json: string): DeviceProfile | null {

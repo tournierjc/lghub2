@@ -60,7 +60,6 @@ export enum HidppFeature {
   // Lighting
   RGB_EFFECTS = 0x8070,
   PER_KEY_LIGHTING_V2 = 0x8071,
-  COLOR_LED_EFFECTS = 0x8100,
 
   // Audio (headsets)
   EQUALIZER = 0x8300,

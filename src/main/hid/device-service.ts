@@ -264,8 +264,11 @@ export class DeviceService {
         device.activeProfile.dpi.levels.forEach((l) => {
           l.isActive = false;
         });
-        const level = device.activeProfile.dpi.levels.find((l) => l.dpi === dpi);
-        if (level) level.isActive = true;
+        const levelIndex = device.activeProfile.dpi.levels.findIndex((l) => l.dpi === dpi);
+        if (levelIndex >= 0) {
+          device.activeProfile.dpi.levels[levelIndex].isActive = true;
+          device.activeProfile.dpi.activeLevelIndex = levelIndex;
+        }
       }
     }
     return success;
@@ -313,7 +316,29 @@ export class DeviceService {
   activateProfile(hidPath: string, profile: import('../../shared/device-types').DeviceProfile): void {
     const device = this.managedDevices.get(hidPath);
     if (!device) return;
-    device.activeProfile = { ...profile };
+    device.activeProfile = this.mergeProfileState(device.activeProfile, profile);
+  }
+
+  syncActiveProfileDpiToHardware(hidPath: string, profile: DeviceProfile): boolean {
+    const device = this.managedDevices.get(hidPath);
+    const targetProfile = device?.activeProfile?.id === profile.id
+      ? this.mergeProfileState(device.activeProfile, profile)
+      : profile;
+
+    if (device?.activeProfile?.id === targetProfile.id) {
+      device.activeProfile = targetProfile;
+    }
+
+    return this.hidppService.syncActiveProfileDpiToHardware(hidPath, targetProfile);
+  }
+
+  private mergeProfileState(currentProfile: DeviceProfile, profile: DeviceProfile): DeviceProfile {
+    return {
+      ...profile,
+      dpi: profile.dpi ?? currentProfile.dpi,
+      lighting: profile.lighting ?? currentProfile.lighting,
+      assignments: profile.assignments ?? currentProfile.assignments,
+    };
   }
 
   async refreshBattery(hidPath: string): Promise<void> {

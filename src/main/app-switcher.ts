@@ -66,6 +66,7 @@ export class AppSwitcher {
 
       profileStore.setActiveProfile(modelId, profile.id);
       deviceService.activateProfile(device.hidPath, profile);
+      deviceService.syncActiveProfileDpiToHardware(device.hidPath, profile);
 
       if (!window.isDestroyed()) {
         window.webContents.send(IpcChannel.APP_PROFILE_SWITCHED, {
