@@ -69,6 +69,7 @@ export function DevicePage() {
 
   const tabs = device ? getAvailableTabs(device) : [];
   const activeProfile = profiles.find((p) => p.id === device?.activeProfile?.id) || device?.activeProfile;
+  const assignedBinaryName = activeProfile?.executableName || activeProfile?.detectionExecutables?.[0] || '';
 
   useEffect(() => {
     if (tabs.length > 0 && !tabs.find((t) => t.id === activeTab)) {
@@ -111,6 +112,7 @@ export function DevicePage() {
   const handleDpiLevelChange = useCallback((levelIndex: number, dpi: number) => {
     if (!device || !activeProfile?.dpi) return;
 
+    const editedLevel = activeProfile.dpi.levels[levelIndex];
     const levels = activeProfile.dpi.levels.map((level, index) => (
       index === levelIndex ? { ...level, dpi } : level
     ));
@@ -118,12 +120,13 @@ export function DevicePage() {
     dispatch(updateProfile({
       modelId: device.modelId,
       profileId: activeProfile.id,
-      updates: {
-        dpi: {
-          ...activeProfile.dpi,
-          levels,
+        updates: {
+          dpi: {
+            ...activeProfile.dpi,
+            defaultDpi: editedLevel?.dpi === activeProfile.dpi.defaultDpi ? dpi : activeProfile.dpi.defaultDpi,
+            levels,
+          },
         },
-      },
     }));
   }, [device, activeProfile, dispatch]);
 
@@ -418,8 +421,8 @@ export function DevicePage() {
               {activeProfile?.applicationPath ? (
                 <div className="app-profiles__assigned">
                   <span className="app-profiles__app-name">{activeProfile.applicationName || activeProfile.applicationPath}</span>
-                  {activeProfile.executableName && (
-                    <span className="app-profiles__app-name">Binary: {activeProfile.executableName}</span>
+                  {assignedBinaryName && (
+                    <span className="app-profiles__app-name">Binary: {assignedBinaryName}</span>
                   )}
                   <button type="button" className="app-profiles__remove-btn" onClick={handleUnassignApp}>Remove</button>
                 </div>
@@ -448,6 +451,9 @@ export function DevicePage() {
                       onClick={() => handleAssignApp(app)}
                     >
                       <span className="app-profiles__result-name">{app.name}</span>
+                      {app.detectionExecutables?.[0] && (
+                        <span className="app-profiles__app-name">Binary: {app.detectionExecutables[0]}</span>
+                      )}
                     </button>
                   ))}
                  </div>

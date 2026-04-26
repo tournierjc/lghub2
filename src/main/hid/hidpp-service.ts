@@ -23,6 +23,9 @@ const ONBOARD_PROFILE_SWITCHED_DPI_OFFSET = 2;
 const ONBOARD_PROFILE_CURRENT_DPI_OFFSET = 3;
 const ONBOARD_PROFILE_DPI_LIST_OFFSET = 4;
 const ONBOARD_PROFILE_MEMORY_CHUNK_SIZE = 16;
+const LIGHTING_SPEED_UI_MAX = 100;
+const COLOR_LED_EFFECT_MIN_PERIOD = 150;
+const COLOR_LED_EFFECT_MAX_PERIOD = 3000;
 
 const OnboardProfileOpcode = {
   GET_PROFILES_DESCR: 0x00,
@@ -57,6 +60,16 @@ interface OnboardProfilesDescriptor {
 interface OnboardProfilesFeatureContext {
   deviceIndex: number;
   featureIndex: number;
+}
+
+interface HidppDpiInfo {
+  current: number;
+  defaultDpi: number;
+  min: number;
+  max: number;
+  step: number;
+  levels: number[];
+  activeLevelIndex: number;
 }
 
 export class HidppService extends EventEmitter {
@@ -302,7 +315,7 @@ export class HidppService extends EventEmitter {
     };
   }
 
-  getDpiInfo(devicePath: string): { current: number; min: number; max: number; step: number; levels: number[] } | null {
+  getDpiInfo(devicePath: string): HidppDpiInfo | null {
     const proto = this.deviceProtocols.get(devicePath);
     if (!proto) return null;
 
@@ -355,7 +368,54 @@ export class HidppService extends EventEmitter {
       if (value > max) max = value;
     }
 
-    return { current: currentDpi, min, max, step, levels: dpiValues };
+    return {
+      current: currentDpi,
+      defaultDpi,
+      min,
+      max,
+      step,
+      levels: dpiValues,
+      activeLevelIndex: dpiValues.indexOf(currentDpi),
+    };
+  }
+
+  getActiveOnboardProfileDpiInfo(devicePath: string): HidppDpiInfo | null {
+    const featureContext = this.getOnboardProfilesFeatureContext(devicePath);
+    if (!featureContext) return null;
+
+    try {
+      const descriptor = this.getOnboardProfilesDescriptor(devicePath, featureContext);
+      if (!descriptor) return null;
+
+      const activeProfileIndex = this.getCurrentOnboardProfileIndex(devicePath, featureContext, descriptor.profileCount);
+      if (activeProfileIndex === null) return null;
+
+      const directorySector = this.readOnboardMemory(
+        devicePath,
+        featureContext,
+        ONBOARD_PROFILE_DIRECTORY_ADDRESS,
+        descriptor.effectiveSectorSize,
+      );
+
+      const activeProfileSectorAddress = this.resolveActiveProfileSectorAddress(
+        directorySector,
+        descriptor.profileCount,
+        activeProfileIndex,
+      );
+      if (activeProfileSectorAddress === null) return null;
+
+      const activeProfileSector = this.readOnboardMemory(
+        devicePath,
+        featureContext,
+        activeProfileSectorAddress,
+        descriptor.effectiveSectorSize,
+      );
+
+      const currentDpiSlotIndex = this.getCurrentOnboardDpiIndex(devicePath, featureContext);
+      return this.parseOnboardProfileDpiInfo(activeProfileSector, currentDpiSlotIndex);
+    } catch {
+      return null;
+    }
   }
 
   setDpi(devicePath: string, dpi: number, sensorIndex: number = 0): boolean {
@@ -639,6 +699,39 @@ export class HidppService extends EventEmitter {
     return nextSector;
   }
 
+  private parseOnboardProfileDpiInfo(sector: Uint8Array, currentDpiSlotIndex: number | null): HidppDpiInfo | null {
+    const levels: number[] = [];
+    const slotToLevelIndex = new Map<number, number>();
+
+    for (let slotIndex = 0; slotIndex < ONBOARD_PROFILE_DPI_SLOT_COUNT; slotIndex++) {
+      const dpiOffset = ONBOARD_PROFILE_DPI_LIST_OFFSET + (slotIndex * 2);
+      const rawDpi = sector[dpiOffset] | (sector[dpiOffset + 1] << 8);
+      if (rawDpi === ONBOARD_PROFILE_DISABLED_DPI || rawDpi === 0) {
+        continue;
+      }
+
+      slotToLevelIndex.set(slotIndex, levels.length);
+      levels.push(rawDpi);
+    }
+
+    if (levels.length === 0) return null;
+
+    const defaultSlotIndex = sector[ONBOARD_PROFILE_DEFAULT_DPI_OFFSET] ?? 0;
+    const activeSlotIndex = currentDpiSlotIndex ?? sector[ONBOARD_PROFILE_CURRENT_DPI_OFFSET] ?? defaultSlotIndex;
+    const activeLevelIndex = slotToLevelIndex.get(activeSlotIndex) ?? slotToLevelIndex.get(defaultSlotIndex) ?? 0;
+    const defaultLevelIndex = slotToLevelIndex.get(defaultSlotIndex) ?? activeLevelIndex;
+
+    return {
+      current: levels[activeLevelIndex] ?? levels[0],
+      defaultDpi: levels[defaultLevelIndex] ?? levels[activeLevelIndex] ?? levels[0],
+      min: Math.min(...levels),
+      max: Math.max(...levels),
+      step: 0,
+      levels,
+      activeLevelIndex,
+    };
+  }
+
   private resolveDefaultDpiSlotIndex(dpiConfig: DpiConfig, fallbackIndex: number, slotCount: number): number {
     const configuredDefaultIndex = dpiConfig.levels.findIndex((level) => level.dpi === dpiConfig.defaultDpi);
     return this.normalizeDpiSlotIndex(configuredDefaultIndex, slotCount, fallbackIndex);
@@ -708,10 +801,15 @@ export class HidppService extends EventEmitter {
 
   private buildColorLedEffectPayload(effectId: number, r: number, g: number, b: number, speed: number, brightness: number): number[] {
     const intensity = brightness === 100 ? 0 : Math.max(1, Math.min(100, brightness));
-    const speedBytes = [(speed >> 8) & 0xff, speed & 0xff];
 
     const payload = new Array(11).fill(0);
     payload[0] = effectId;
+
+    const applySpeedBytes = (offset: number) => {
+      const effectPeriod = this.mapUiLightingSpeedToEffectPeriod(speed);
+      payload[offset] = (effectPeriod >> 8) & 0xff;
+      payload[offset + 1] = effectPeriod & 0xff;
+    };
 
     switch (effectId) {
       case 0x01: // fixed
@@ -721,13 +819,11 @@ export class HidppService extends EventEmitter {
         payload[4] = 0x00;
         break;
       case 0x03: // cycle
-        payload[6] = speedBytes[0];
-        payload[7] = speedBytes[1];
+        applySpeedBytes(6);
         payload[8] = intensity;
         break;
       case 0x04: // wave
-        payload[6] = speedBytes[0];
-        payload[7] = speedBytes[1];
+        applySpeedBytes(6);
         payload[8] = intensity;
         break;
       case 0x05: // starlight
@@ -742,8 +838,7 @@ export class HidppService extends EventEmitter {
         payload[1] = r & 0xff;
         payload[2] = g & 0xff;
         payload[3] = b & 0xff;
-        payload[4] = speedBytes[0];
-        payload[5] = speedBytes[1];
+        applySpeedBytes(4);
         payload[6] = 0x00;
         payload[7] = intensity;
         break;
@@ -751,8 +846,7 @@ export class HidppService extends EventEmitter {
         payload[1] = r & 0xff;
         payload[2] = g & 0xff;
         payload[3] = b & 0xff;
-        payload[5] = speedBytes[0];
-        payload[6] = speedBytes[1];
+        applySpeedBytes(5);
         break;
       default:
         payload[0] = 0x01;
@@ -764,6 +858,13 @@ export class HidppService extends EventEmitter {
     }
 
     return payload;
+  }
+
+  private mapUiLightingSpeedToEffectPeriod(speed: number): number {
+    const clampedSpeed = Math.max(0, Math.min(LIGHTING_SPEED_UI_MAX, Math.trunc(speed)));
+    const normalizedSpeed = clampedSpeed / LIGHTING_SPEED_UI_MAX;
+    const effectPeriod = COLOR_LED_EFFECT_MAX_PERIOD - (normalizedSpeed * (COLOR_LED_EFFECT_MAX_PERIOD - COLOR_LED_EFFECT_MIN_PERIOD));
+    return Math.round(effectPeriod);
   }
 
   setRgbZoneColor(devicePath: string, zoneIndex: number, r: number, g: number, b: number): boolean {

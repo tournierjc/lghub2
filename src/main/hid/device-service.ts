@@ -12,6 +12,9 @@ import {
   RGBColor,
 } from '../../shared/device-types';
 import { LOGITECH_VENDOR_ID, KNOWN_DEVICES, DEVICE_INDEX } from '../../shared/hidpp-protocol';
+import { mergeProfileStateWithScanned } from '../../shared/profile-utils';
+
+type HidppDpiInfo = NonNullable<ReturnType<HidppService['getDpiInfo']>>;
 
 export class DeviceService {
   private hidManager: HidManager;
@@ -142,7 +145,8 @@ export class DeviceService {
     const deviceType = this.inferDeviceType(knownInfo?.type, hidDevice);
     const firmware = this.hidppService.getFirmwareVersion(hidDevice.path);
     const battery = this.hidppService.getBatteryStatus(hidDevice.path);
-    const dpiInfo = this.hidppService.getDpiInfo(hidDevice.path);
+    const dpiInfo = this.hidppService.getActiveOnboardProfileDpiInfo(hidDevice.path)
+      ?? this.hidppService.getDpiInfo(hidDevice.path);
     const rgbInfo = this.hidppService.getRgbEffectInfo(hidDevice.path);
     const keysInfo = this.hidppService.getSpecialKeys(hidDevice.path);
 
@@ -150,17 +154,7 @@ export class DeviceService {
       id: uuidv4(),
       name: 'Default',
       isDefault: true,
-      dpi: dpiInfo ? {
-        levels: dpiInfo.levels.length > 0
-          ? dpiInfo.levels.map((dpi, idx) => ({
-              dpi,
-              color: this.dpiLevelColor(idx),
-              isActive: dpi === dpiInfo.current,
-            }))
-          : [{ dpi: dpiInfo.current, color: { r: 0, g: 212, b: 255 }, isActive: true }],
-        activeLevelIndex: dpiInfo.levels.indexOf(dpiInfo.current),
-        defaultDpi: dpiInfo.current,
-      } : undefined,
+      dpi: dpiInfo ? this.buildDpiConfig(dpiInfo) : undefined,
     };
 
     return {
@@ -248,6 +242,25 @@ export class DeviceService {
     return colors[index % colors.length];
   }
 
+  private buildDpiConfig(dpiInfo: HidppDpiInfo): DpiConfig {
+    const levels = dpiInfo.levels.length > 0
+      ? dpiInfo.levels.map((dpi, idx) => ({
+          dpi,
+          color: this.dpiLevelColor(idx),
+          isActive: idx === dpiInfo.activeLevelIndex || (dpiInfo.activeLevelIndex < 0 && dpi === dpiInfo.current),
+        }))
+      : [{ dpi: dpiInfo.current, color: { r: 0, g: 212, b: 255 }, isActive: true }];
+    const defaultDpi = levels.some((level) => level.dpi === dpiInfo.defaultDpi)
+      ? dpiInfo.defaultDpi
+      : dpiInfo.current;
+
+    return {
+      levels,
+      activeLevelIndex: dpiInfo.activeLevelIndex >= 0 ? dpiInfo.activeLevelIndex : 0,
+      defaultDpi,
+    };
+  }
+
   getDevice(hidPath: string): Device | undefined {
     return this.managedDevices.get(hidPath);
   }
@@ -333,12 +346,7 @@ export class DeviceService {
   }
 
   private mergeProfileState(currentProfile: DeviceProfile, profile: DeviceProfile): DeviceProfile {
-    return {
-      ...profile,
-      dpi: profile.dpi ?? currentProfile.dpi,
-      lighting: profile.lighting ?? currentProfile.lighting,
-      assignments: profile.assignments ?? currentProfile.assignments,
-    };
+    return mergeProfileStateWithScanned(profile, currentProfile);
   }
 
   async refreshBattery(hidPath: string): Promise<void> {

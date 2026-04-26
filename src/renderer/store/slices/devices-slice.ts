@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { Device, DeviceProfile, LightingConfig, LightingEffect } from '../../../shared/device-types';
 import { HidDeviceInfo } from '../../../shared/ipc-channels';
+import { mergeProfileStateWithScanned } from '../../../shared/profile-utils';
 
 export interface DevicesState {
   discovered: HidDeviceInfo[];
@@ -176,19 +177,14 @@ const devicesSlice = createSlice({
     },
     profileAutoSwitched(state, action: PayloadAction<{ modelId: string; profileId: string }>) {
       const { modelId, profileId } = action.payload;
-      const device = state.connected.find((d) => d.modelId === modelId);
-      if (device) {
-        const profile = state.profiles[modelId]?.find((p) => p.id === profileId);
-        if (profile) {
-          device.activeProfile = {
-            ...profile,
-            dpi: profile.dpi ?? device.activeProfile?.dpi,
-            lighting: profile.lighting ?? device.activeProfile?.lighting,
-            assignments: profile.assignments ?? device.activeProfile?.assignments,
-          };
+        const device = state.connected.find((d) => d.modelId === modelId);
+        if (device) {
+          const profile = state.profiles[modelId]?.find((p) => p.id === profileId);
+          if (profile) {
+            device.activeProfile = mergeProfileStateWithScanned(profile, device.activeProfile);
+          }
         }
-      }
-    },
+      },
   },
   extraReducers: (builder) => {
     builder
@@ -265,12 +261,11 @@ const devicesSlice = createSlice({
             profiles.find((p) => p.id === device.activeProfile?.id) ||
             profiles.find((p) => p.isDefault) ||
             profiles[0];
-          device.activeProfile = {
-            ...active,
-            dpi: active.dpi ?? scannedDpi,
-            lighting: active.lighting ?? scannedLighting,
-            assignments: active.assignments ?? scannedAssignments,
-          };
+          device.activeProfile = mergeProfileStateWithScanned(active, {
+            dpi: scannedDpi,
+            lighting: scannedLighting,
+            assignments: scannedAssignments,
+          });
         }
       })
       .addCase(createProfile.fulfilled, (state, action) => {
@@ -286,12 +281,7 @@ const devicesSlice = createSlice({
         }
         const device = state.connected.find((d) => d.modelId === modelId);
         if (device && device.activeProfile?.id === profileId && profile) {
-          device.activeProfile = {
-            ...profile,
-            dpi: profile.dpi ?? device.activeProfile?.dpi,
-            lighting: profile.lighting ?? device.activeProfile?.lighting,
-            assignments: profile.assignments ?? device.activeProfile?.assignments,
-          };
+          device.activeProfile = mergeProfileStateWithScanned(profile, device.activeProfile);
         }
       })
       .addCase(deleteProfile.fulfilled, (state, action) => {
@@ -304,12 +294,7 @@ const devicesSlice = createSlice({
           const remaining = state.profiles[modelId];
           const newActive = remaining?.find((p) => p.isDefault) || remaining?.[0];
           if (newActive) {
-            device.activeProfile = {
-              ...newActive,
-              dpi: newActive.dpi ?? device.activeProfile?.dpi,
-              lighting: newActive.lighting ?? device.activeProfile?.lighting,
-              assignments: newActive.assignments ?? device.activeProfile?.assignments,
-            };
+            device.activeProfile = mergeProfileStateWithScanned(newActive, device.activeProfile);
           }
         }
       })
@@ -320,12 +305,7 @@ const devicesSlice = createSlice({
           const profiles = state.profiles[modelId];
           const profile = profiles?.find((p) => p.id === profileId);
           if (profile) {
-            device.activeProfile = {
-              ...profile,
-              dpi: profile.dpi ?? device.activeProfile?.dpi,
-              lighting: profile.lighting ?? device.activeProfile?.lighting,
-              assignments: profile.assignments ?? device.activeProfile?.assignments,
-            };
+            device.activeProfile = mergeProfileStateWithScanned(profile, device.activeProfile);
           }
         }
       })

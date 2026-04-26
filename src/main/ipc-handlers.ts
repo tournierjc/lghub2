@@ -9,6 +9,7 @@ import { ProfileStore } from './profile-store';
 import { MarketplaceService } from './marketplace-service';
 import { DeviceProfile } from '../shared/device-types';
 import { extractDetectionExecutables } from './app-detection';
+import { mergeProfileStateWithScanned } from '../shared/profile-utils';
 
 interface CatalogApplication {
   name: string;
@@ -154,12 +155,11 @@ export function registerIpcHandlers(window: BrowserWindow, hidManager: HidManage
       const scannedDpi = device.activeProfile?.dpi;
       const scannedLighting = device.activeProfile?.lighting;
       const scannedAssignments = device.activeProfile?.assignments;
-      device.activeProfile = {
-        ...active,
-        dpi: active.dpi ?? scannedDpi,
-        lighting: active.lighting ?? scannedLighting,
-        assignments: active.assignments ?? scannedAssignments,
-      };
+      device.activeProfile = mergeProfileStateWithScanned(active, {
+        dpi: scannedDpi,
+        lighting: scannedLighting,
+        assignments: scannedAssignments,
+      });
     }
 
     return profiles;
