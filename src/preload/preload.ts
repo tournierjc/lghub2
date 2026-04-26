@@ -73,9 +73,9 @@ const profileApi = {
     ipcRenderer.invoke(IpcChannel.PROFILE_EXPORT, modelId, profileId),
   import: (modelId: string) =>
     ipcRenderer.invoke(IpcChannel.PROFILE_IMPORT, modelId),
-  onProfileSwitched: (callback: (modelId: string, profileId: string) => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, payload: { modelId: string; profileId: string }) =>
-      callback(payload.modelId, payload.profileId);
+  onProfileSwitched: (callback: (modelId: string, profileId: string, app?: string) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: { modelId: string; profileId: string; app?: string }) =>
+      callback(payload.modelId, payload.profileId, payload.app);
     ipcRenderer.on(IpcChannel.APP_PROFILE_SWITCHED, handler);
     return () => ipcRenderer.removeListener(IpcChannel.APP_PROFILE_SWITCHED, handler);
   },

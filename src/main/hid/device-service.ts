@@ -10,6 +10,7 @@ import {
   LightingCapability,
   DeviceProfile,
   DpiConfig,
+  ButtonAssignment,
 } from '../../shared/device-types';
 import { LOGITECH_VENDOR_ID, KNOWN_DEVICES, DEVICE_INDEX } from '../../shared/hidpp-protocol';
 import { mergeProfileStateWithScanned } from '../../shared/profile-utils';
@@ -154,11 +155,14 @@ export class DeviceService {
     const rgbInfo = this.hidppService.getRgbEffectInfo(hidDevice.path);
     const keysInfo = this.hidppService.getSpecialKeys(hidDevice.path);
 
+    const hardwareAssignments = keysInfo ? this.buildAssignmentsFromHardware(keysInfo.buttons) : undefined;
+
     const defaultProfile: DeviceProfile = {
       id: uuidv4(),
       name: 'Default',
       isDefault: true,
-       dpi: dpiInfo ? this.buildDpiConfig(dpiInfo, vendorDpiInfo ?? dpiInfo) : undefined,
+      dpi: dpiInfo ? this.buildDpiConfig(dpiInfo, vendorDpiInfo ?? dpiInfo) : undefined,
+      assignments: hardwareAssignments,
     };
 
     return {
@@ -186,6 +190,31 @@ export class DeviceService {
         ledCount: 1,
       })) : undefined,
     };
+  }
+
+  private buildAssignmentsFromHardware(buttons: import('./hidpp-service').SpecialKeyInfo[]): Record<string, ButtonAssignment> {
+    const assignments: Record<string, ButtonAssignment> = {};
+    for (const btn of buttons) {
+      const hexKey = btn.controlId.toString(16).padStart(4, '0');
+      const action = this.inferActionFromTaskId(btn.taskId);
+      assignments[hexKey] = {
+        buttonId: hexKey,
+        action,
+      };
+    }
+    return assignments;
+  }
+
+  private inferActionFromTaskId(taskId: number): import('../../shared/device-types').ButtonAction {
+    if (taskId === 0x0000) return { type: 'disabled', value: '' };
+
+    const dpiTasks = [0x00c2, 0x00d6, 0x00d7, 0x00d8, 0x00d9];
+    if (dpiTasks.includes(taskId)) return { type: 'dpi', value: taskId };
+
+    const mediaTasks = [0x00e0, 0x00e1, 0x00e2, 0x00e3, 0x00e4, 0x00e5, 0x00e6];
+    if (mediaTasks.includes(taskId)) return { type: 'media', value: taskId };
+
+    return { type: 'system', value: taskId };
   }
 
   private inferDeviceType(knownType: string | undefined, hidDevice: HidDeviceInfo): DeviceType {

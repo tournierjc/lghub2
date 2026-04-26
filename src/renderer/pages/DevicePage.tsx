@@ -53,6 +53,7 @@ export function DevicePage() {
   const profiles = useAppSelector((state) =>
     device ? state.devices.profiles[device.modelId] || [] : []
   );
+  const lastSwitchedApp = useAppSelector((state) => state.devices.lastSwitchedApp);
 
   const [activeTab, setActiveTab] = useState<DeviceTab>('dpi');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -71,6 +72,7 @@ export function DevicePage() {
   const tabs = device ? getAvailableTabs(device) : [];
   const activeProfile = profiles.find((p) => p.id === device?.activeProfile?.id) || device?.activeProfile;
   const assignedBinaryName = activeProfile?.executableName || activeProfile?.detectionExecutables?.[0] || '';
+  const allDetectionExecutables = activeProfile?.detectionExecutables || [];
 
   useEffect(() => {
     if (tabs.length > 0 && !tabs.find((t) => t.id === activeTab)) {
@@ -412,13 +414,24 @@ export function DevicePage() {
         )}
         {activeTab === 'apps' && (
           <div className="app-profiles">
+            {lastSwitchedApp && (
+              <div className="app-profiles__last-switched">
+                <span className="app-profiles__last-switched-label">Last detected:</span>
+                <span className="app-profiles__last-switched-app">{lastSwitchedApp}</span>
+              </div>
+            )}
             <div className="app-profiles__current">
               <h3 className="app-profiles__label">Auto-switch for profile: {activeProfile?.name}</h3>
               {activeProfile?.applicationPath ? (
                 <div className="app-profiles__assigned">
                   <span className="app-profiles__app-name">{activeProfile.applicationName || activeProfile.applicationPath}</span>
-                  {assignedBinaryName && (
-                    <span className="app-profiles__app-name">Binary: {assignedBinaryName}</span>
+                  {allDetectionExecutables.length > 0 && (
+                    <span className="app-profiles__app-name">
+                      Binary{allDetectionExecutables.length > 1 ? 'ies' : ''}: {allDetectionExecutables.join(', ')}
+                    </span>
+                  )}
+                  {assignedBinaryName && !allDetectionExecutables.includes(assignedBinaryName) && (
+                    <span className="app-profiles__app-name">Custom binary: {assignedBinaryName}</span>
                   )}
                   <button type="button" className="app-profiles__remove-btn" onClick={handleUnassignApp}>Remove</button>
                 </div>
@@ -439,19 +452,21 @@ export function DevicePage() {
                {appSearching && <div className="app-profiles__searching">Searching…</div>}
                {appResults.length > 0 && (
                  <div className="app-profiles__results">
-                  {appResults.map((app) => (
-                    <button
-                      type="button"
-                      key={app.applicationId || app.id || app.name}
-                      className="app-profiles__result"
-                      onClick={() => handleAssignApp(app)}
-                    >
-                      <span className="app-profiles__result-name">{app.name}</span>
-                      {app.detectionExecutables?.[0] && (
-                        <span className="app-profiles__app-name">Binary: {app.detectionExecutables[0]}</span>
-                      )}
-                    </button>
-                  ))}
+                   {appResults.map((app) => (
+                     <button
+                       type="button"
+                       key={app.applicationId || app.id || app.name}
+                       className="app-profiles__result"
+                       onClick={() => handleAssignApp(app)}
+                     >
+                       <span className="app-profiles__result-name">{app.name}</span>
+                       {app.detectionExecutables && app.detectionExecutables.length > 0 && (
+                         <span className="app-profiles__app-name">
+                           Binary{app.detectionExecutables.length > 1 ? 'ies' : ''}: {app.detectionExecutables.join(', ')}
+                         </span>
+                       )}
+                     </button>
+                   ))}
                  </div>
                )}
                <div className="app-profiles__searching">

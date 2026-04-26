@@ -10,6 +10,7 @@ export interface DevicesState {
   profiles: Record<string, DeviceProfile[]>;
   loading: boolean;
   error: string | null;
+  lastSwitchedApp: string | null;
 }
 
 const initialState: DevicesState = {
@@ -19,6 +20,7 @@ const initialState: DevicesState = {
   profiles: {},
   loading: false,
   error: null,
+  lastSwitchedApp: null,
 };
 
 export const scanDevices = createAsyncThunk('devices/scan', async () => {
@@ -175,16 +177,17 @@ const devicesSlice = createSlice({
     clearError(state) {
       state.error = null;
     },
-    profileAutoSwitched(state, action: PayloadAction<{ modelId: string; profileId: string }>) {
-      const { modelId, profileId } = action.payload;
-        const device = state.connected.find((d) => d.modelId === modelId);
-        if (device) {
-          const profile = state.profiles[modelId]?.find((p) => p.id === profileId);
-          if (profile) {
-            device.activeProfile = mergeProfileStateWithScanned(profile, device.activeProfile);
-          }
+    profileAutoSwitched(state, action: PayloadAction<{ modelId: string; profileId: string; app?: string }>) {
+      const { modelId, profileId, app } = action.payload;
+      state.lastSwitchedApp = app || null;
+      const device = state.connected.find((d) => d.modelId === modelId);
+      if (device) {
+        const profile = state.profiles[modelId]?.find((p) => p.id === profileId);
+        if (profile) {
+          device.activeProfile = mergeProfileStateWithScanned(profile, device.activeProfile);
         }
-      },
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
