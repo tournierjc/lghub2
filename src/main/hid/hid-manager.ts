@@ -5,6 +5,7 @@ import { HidDeviceInfo } from '../../shared/ipc-channels';
 
 interface ConnectedDevice {
   device: HID.HID;
+  notificationDevice?: HID.HID;
   path: string;
   info: HidDeviceInfo;
 }
@@ -45,7 +46,23 @@ export class HidManager extends EventEmitter {
 
       if (!info) return false;
 
-      const connected: ConnectedDevice = { device, path: devicePath, info };
+      let notificationDevice: HID.HID | undefined;
+      if (process.platform === 'linux') {
+        try {
+          notificationDevice = new HID.HID(devicePath);
+          notificationDevice.on('data', (data: Buffer) => {
+            this.emit('device-data', devicePath, Array.from(data));
+          });
+          notificationDevice.on('error', (err: Error) => {
+            console.error(`HID notification device error [${devicePath}]:`, err.message);
+            this.disconnect(devicePath);
+          });
+        } catch (err) {
+          console.warn(`Failed to open HID notification handle [${devicePath}]:`, err);
+        }
+      }
+
+      const connected: ConnectedDevice = { device, notificationDevice, path: devicePath, info };
       this.connectedDevices.set(devicePath, connected);
 
       device.on('error', (err: Error) => {
@@ -67,6 +84,12 @@ export class HidManager extends EventEmitter {
       try {
         connected.device.close();
       } catch {
+      }
+      if (connected.notificationDevice) {
+        try {
+          connected.notificationDevice.close();
+        } catch {
+        }
       }
       this.connectedDevices.delete(devicePath);
       this.emit('device-disconnected', devicePath);

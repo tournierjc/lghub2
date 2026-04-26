@@ -578,6 +578,73 @@ button {
   }
 }
 
+.device-image {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  height: 100%;
+
+  &__svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  &__overlay {
+    position: absolute;
+    inset: 0;
+  }
+
+  &__button {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0;
+    transform: translate(-50%, -50%);
+    color: var(--text-primary);
+    font-size: 10px;
+    line-height: 1;
+    opacity: 0.88;
+
+    &:hover {
+      opacity: 1;
+    }
+
+    &--selected {
+      opacity: 1;
+
+      .device-image__button-dot {
+        background: var(--accent-primary);
+        box-shadow: 0 0 0 4px rgba(0, 200, 255, 0.14);
+      }
+    }
+  }
+
+  &__button-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    background: rgba(17, 150, 255, 0.7);
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.18);
+  }
+
+  &__button-label {
+    display: none;
+    padding: 3px 6px;
+    border-radius: 999px;
+    background: rgba(7, 7, 15, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
+  }
+
+  &__button:hover &__button-label,
+  &__button--selected &__button-label {
+    display: inline-flex;
+  }
+}
+
 // Profile bar
 .profile-bar {
   margin-bottom: 16px;
@@ -1385,6 +1452,15 @@ button {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+  }
+
+  &__diagram {
+    padding: 12px 20px 0;
+  }
+
+  &__diagram-image {
+    max-width: 100%;
+    max-height: 180px;
   }
 
   &__panel-title {

@@ -159,7 +159,7 @@ export function LightingEditor({ device, onLightingChange }: Props) {
           <h3 className="lighting-editor__section-title">Parameters</h3>
           {selectedPrefab?.hasSpeed && (
             <div className="lighting-editor__control">
-              <label htmlFor="lighting-speed">Speed</label>
+              <label htmlFor="lighting-speed">Speed (0 = static)</label>
               <input
                 id="lighting-speed"
                 type="range"

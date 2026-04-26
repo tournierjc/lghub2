@@ -11,7 +11,7 @@ import { ButtonEditor } from '../components/devices/ButtonEditor';
 import { EqEditor } from '../components/devices/EqEditor';
 import { DeviceImage } from '../components/devices/DeviceImage';
 import { LightingEffect } from '../../shared/device-types';
-import type { Device, DeviceProfile, LightingConfig, ButtonAssignment } from '../../shared/device-types';
+import type { Device, DeviceProfile, LightingConfig, ButtonAssignment, DpiConfig } from '../../shared/device-types';
 
 type DeviceTab = 'dpi' | 'lighting' | 'assignments' | 'equalizer' | 'apps';
 
@@ -56,6 +56,7 @@ export function DevicePage() {
 
   const [activeTab, setActiveTab] = useState<DeviceTab>('dpi');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [selectedButtonId, setSelectedButtonId] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [creating, setCreating] = useState(false);
@@ -109,24 +110,13 @@ export function DevicePage() {
     dispatch(setDeviceDpi({ hidPath: device.hidPath, dpi }));
   }, [device, dispatch]);
 
-  const handleDpiLevelChange = useCallback((levelIndex: number, dpi: number) => {
+  const handleDpiConfigChange = useCallback((dpi: DpiConfig) => {
     if (!device || !activeProfile?.dpi) return;
-
-    const editedLevel = activeProfile.dpi.levels[levelIndex];
-    const levels = activeProfile.dpi.levels.map((level, index) => (
-      index === levelIndex ? { ...level, dpi } : level
-    ));
 
     dispatch(updateProfile({
       modelId: device.modelId,
       profileId: activeProfile.id,
-        updates: {
-          dpi: {
-            ...activeProfile.dpi,
-            defaultDpi: editedLevel?.dpi === activeProfile.dpi.defaultDpi ? dpi : activeProfile.dpi.defaultDpi,
-            levels,
-          },
-        },
+      updates: { dpi },
     }));
   }, [device, activeProfile, dispatch]);
 
@@ -403,13 +393,19 @@ export function DevicePage() {
 
       <div className="device-page__content">
         {activeTab === 'dpi' && (
-          <DpiEditor device={device} onDpiChange={handleDpiChange} onDpiLevelChange={handleDpiLevelChange} />
+          <DpiEditor device={device} onDpiChange={handleDpiChange} onDpiConfigChange={handleDpiConfigChange} />
         )}
         {activeTab === 'lighting' && (
           <LightingEditor device={device} onLightingChange={handleLightingChange} />
         )}
         {activeTab === 'assignments' && activeProfile && (
-          <ButtonEditor device={device} activeProfile={activeProfile} onApply={handleButtonApply} />
+          <ButtonEditor
+            device={device}
+            activeProfile={activeProfile}
+            onApply={handleButtonApply}
+            selectedButtonId={selectedButtonId}
+            onSelectButton={setSelectedButtonId}
+          />
         )}
         {activeTab === 'equalizer' && (
           <EqEditor device={device} onEqChange={handleEqChange} />

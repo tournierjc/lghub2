@@ -70,6 +70,7 @@ export interface DpiLevel {
 
 export interface DpiConfig {
   levels: DpiLevel[];
+  supportedValues?: number[];
   activeLevelIndex: number;
   defaultDpi: number;
 }

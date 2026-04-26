@@ -44,7 +44,7 @@ interface FeatureMapping {
   featureType: number;
 }
 
-interface DeviceProtocolInfo {
+export interface DeviceProtocolInfo {
   deviceIndex: number;
   features: Map<HidppFeature, FeatureMapping>;
   protocolMajor: number;
@@ -79,6 +79,10 @@ export class HidppService extends EventEmitter {
   constructor(hidManager: HidManager) {
     super();
     this.hidManager = hidManager;
+  }
+
+  getProtocolInfo(devicePath: string): DeviceProtocolInfo | undefined {
+    return this.deviceProtocols.get(devicePath);
   }
 
   private sendRequest(
@@ -805,6 +809,15 @@ export class HidppService extends EventEmitter {
     const payload = new Array(11).fill(0);
     payload[0] = effectId;
 
+    if (speed <= 0 && effectId !== 0x01) {
+      payload[0] = 0x01;
+      payload[1] = r & 0xff;
+      payload[2] = g & 0xff;
+      payload[3] = b & 0xff;
+      payload[4] = 0x00;
+      return payload;
+    }
+
     const applySpeedBytes = (offset: number) => {
       const effectPeriod = this.mapUiLightingSpeedToEffectPeriod(speed);
       payload[offset] = (effectPeriod >> 8) & 0xff;
@@ -976,6 +989,32 @@ export class HidppService extends EventEmitter {
         controlId & 0xff,
         (newTaskId >> 8) & 0xff,
         newTaskId & 0xff,
+      ]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  divertButton(devicePath: string, controlId: number, divert: boolean, persist = true): boolean {
+    const proto = this.deviceProtocols.get(devicePath);
+    if (!proto) return false;
+
+    const feature = proto.features.get(HidppFeature.SPECIAL_KEYS_BUTTONS);
+    if (!feature) return false;
+
+    // SetCidReporting (function 0x03) with diversion flags
+    // Params: controlId (2), taskId (2), divert (1), persist (1), rawXY (1)
+    // taskId 0x0000 means no hardware action — handled entirely in software
+    try {
+      this.sendRequest(devicePath, proto.deviceIndex, feature.featureIndex, 0x03, [
+        (controlId >> 8) & 0xff,
+        controlId & 0xff,
+        0x00,
+        0x00,
+        divert ? 0x01 : 0x00,
+        persist ? 0x01 : 0x00,
+        0x00,
       ]);
       return true;
     } catch {

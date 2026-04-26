@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { HidManager } from './hid-manager';
 import { HidppService } from './hidpp-service';
+import { MacroRuntime } from './macro-runtime';
 import { HidDeviceInfo } from '../../shared/ipc-channels';
 import {
   Device,
@@ -9,21 +10,23 @@ import {
   LightingCapability,
   DeviceProfile,
   DpiConfig,
-  RGBColor,
 } from '../../shared/device-types';
 import { LOGITECH_VENDOR_ID, KNOWN_DEVICES, DEVICE_INDEX } from '../../shared/hidpp-protocol';
 import { mergeProfileStateWithScanned } from '../../shared/profile-utils';
+import { getDpiLevelColor } from '../../shared/profile-utils';
 
 type HidppDpiInfo = NonNullable<ReturnType<HidppService['getDpiInfo']>>;
 
 export class DeviceService {
   private hidManager: HidManager;
   private hidppService: HidppService;
+  private macroRuntime: MacroRuntime;
   private managedDevices = new Map<string, Device>();
 
   constructor(hidManager: HidManager) {
     this.hidManager = hidManager;
     this.hidppService = new HidppService(hidManager);
+    this.macroRuntime = new MacroRuntime(hidManager, this.hidppService);
   }
 
   async scanAndConnect(): Promise<Device[]> {
@@ -145,8 +148,9 @@ export class DeviceService {
     const deviceType = this.inferDeviceType(knownInfo?.type, hidDevice);
     const firmware = this.hidppService.getFirmwareVersion(hidDevice.path);
     const battery = this.hidppService.getBatteryStatus(hidDevice.path);
-    const dpiInfo = this.hidppService.getActiveOnboardProfileDpiInfo(hidDevice.path)
-      ?? this.hidppService.getDpiInfo(hidDevice.path);
+    const onboardDpiInfo = this.hidppService.getActiveOnboardProfileDpiInfo(hidDevice.path);
+    const vendorDpiInfo = this.hidppService.getDpiInfo(hidDevice.path);
+    const dpiInfo = onboardDpiInfo ?? vendorDpiInfo;
     const rgbInfo = this.hidppService.getRgbEffectInfo(hidDevice.path);
     const keysInfo = this.hidppService.getSpecialKeys(hidDevice.path);
 
@@ -154,7 +158,7 @@ export class DeviceService {
       id: uuidv4(),
       name: 'Default',
       isDefault: true,
-      dpi: dpiInfo ? this.buildDpiConfig(dpiInfo) : undefined,
+       dpi: dpiInfo ? this.buildDpiConfig(dpiInfo, vendorDpiInfo ?? dpiInfo) : undefined,
     };
 
     return {
@@ -231,22 +235,11 @@ export class DeviceService {
     }
   }
 
-  private dpiLevelColor(index: number): RGBColor {
-    const colors: RGBColor[] = [
-      { r: 0, g: 212, b: 255 },
-      { r: 255, g: 165, b: 0 },
-      { r: 0, g: 255, b: 100 },
-      { r: 255, g: 50, b: 50 },
-      { r: 180, g: 0, b: 255 },
-    ];
-    return colors[index % colors.length];
-  }
-
-  private buildDpiConfig(dpiInfo: HidppDpiInfo): DpiConfig {
+  private buildDpiConfig(dpiInfo: HidppDpiInfo, supportedDpiInfo?: HidppDpiInfo): DpiConfig {
     const levels = dpiInfo.levels.length > 0
       ? dpiInfo.levels.map((dpi, idx) => ({
           dpi,
-          color: this.dpiLevelColor(idx),
+          color: getDpiLevelColor(idx),
           isActive: idx === dpiInfo.activeLevelIndex || (dpiInfo.activeLevelIndex < 0 && dpi === dpiInfo.current),
         }))
       : [{ dpi: dpiInfo.current, color: { r: 0, g: 212, b: 255 }, isActive: true }];
@@ -256,6 +249,7 @@ export class DeviceService {
 
     return {
       levels,
+      supportedValues: [...(supportedDpiInfo?.levels ?? dpiInfo.levels)],
       activeLevelIndex: dpiInfo.activeLevelIndex >= 0 ? dpiInfo.activeLevelIndex : 0,
       defaultDpi,
     };
@@ -324,12 +318,14 @@ export class DeviceService {
     const device = this.managedDevices.get(hidPath);
     if (!device) return;
     device.activeProfile.assignments = { ...assignments };
+    this.macroRuntime.activateProfile(hidPath, device.activeProfile);
   }
 
   activateProfile(hidPath: string, profile: import('../../shared/device-types').DeviceProfile): void {
     const device = this.managedDevices.get(hidPath);
     if (!device) return;
     device.activeProfile = this.mergeProfileState(device.activeProfile, profile);
+    this.macroRuntime.activateProfile(hidPath, device.activeProfile);
   }
 
   syncActiveProfileDpiToHardware(hidPath: string, profile: DeviceProfile): boolean {
@@ -358,6 +354,7 @@ export class DeviceService {
   }
 
   disconnectDevice(hidPath: string): void {
+    this.macroRuntime.deactivateDevice(hidPath);
     this.hidppService.disposeDevice(hidPath);
     this.managedDevices.delete(hidPath);
     this.hidManager.disconnect(hidPath);
@@ -367,6 +364,7 @@ export class DeviceService {
     for (const [path] of this.managedDevices) {
       this.disconnectDevice(path);
     }
+    this.macroRuntime.dispose();
     this.hidppService.dispose();
   }
 }
