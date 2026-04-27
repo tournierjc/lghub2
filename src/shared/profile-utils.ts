@@ -1,4 +1,4 @@
-import { DeviceProfile, DpiConfig, RGBColor } from './device-types';
+import type { DeviceProfile, DpiConfig, RGBColor } from './device-types';
 
 export function getDpiLevelColor(index: number): RGBColor {
   const colors: RGBColor[] = [
@@ -14,9 +14,10 @@ export function getDpiLevelColor(index: number): RGBColor {
 
 export function getSupportedDpiValues(dpiConfig?: DpiConfig): number[] {
   if (!dpiConfig) return [];
-  return dpiConfig.supportedValues && dpiConfig.supportedValues.length > 0
+  const values = dpiConfig.supportedValues && dpiConfig.supportedValues.length > 0
     ? [...dpiConfig.supportedValues]
     : dpiConfig.levels.map((level) => level.dpi);
+  return [...new Set(values.filter((value) => Number.isFinite(value) && value > 0))];
 }
 
 export function normalizeDpiConfig(dpiConfig: DpiConfig, preferredActiveDpi?: number): DpiConfig {

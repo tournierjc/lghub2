@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import type { DeviceProfile } from '../../shared/device-types';
+import type { DeviceProfile, KeyActionValue } from '../../shared/device-types';
 import type { HidppFeature } from '../../shared/hidpp-protocol';
 import type { HidManager } from './hid-manager';
 import { parseHidppNotification, type DivertedButtonEvent } from './hidpp-notifications';
@@ -41,7 +41,7 @@ export class MacroRuntime extends EventEmitter {
 
     if (profile.assignments) {
       for (const assignment of Object.values(profile.assignments)) {
-        if (assignment.action.type === 'macro') {
+        if (assignment.action.type === 'macro' || assignment.action.type === 'key') {
           const controlId = parseInt(assignment.buttonId, 16);
           if (!Number.isNaN(controlId)) {
             this.hidppService.divertButton(devicePath, controlId, true, true);
@@ -55,7 +55,7 @@ export class MacroRuntime extends EventEmitter {
     const active = this.activeDevices.get(devicePath);
     if (active?.profile.assignments) {
       for (const assignment of Object.values(active.profile.assignments)) {
-        if (assignment.action.type === 'macro') {
+        if (assignment.action.type === 'macro' || assignment.action.type === 'key') {
           const controlId = parseInt(assignment.buttonId, 16);
           if (!Number.isNaN(controlId)) {
             this.hidppService.divertButton(devicePath, controlId, false, false);
@@ -83,15 +83,24 @@ export class MacroRuntime extends EventEmitter {
 
     const hexKey = event.controlId.toString(16).padStart(4, '0');
     const assignment = profile.assignments?.[hexKey];
-    if (!assignment || assignment.action.type !== 'macro') return;
+    if (!assignment) return;
 
-    const macroSteps = Array.isArray(assignment.action.value) ? assignment.action.value : [];
-    if (macroSteps.length === 0) return;
+    if (assignment.action.type === 'macro') {
+      const macroSteps = Array.isArray(assignment.action.value) ? assignment.action.value : [];
+      if (macroSteps.length === 0) return;
 
-    this.emit('macro-triggered', event.devicePath, hexKey, macroSteps);
-    this.macroExecutor.executeMacro(macroSteps).catch((err) => {
-      console.error('Macro execution failed:', err);
-    });
+      this.emit('macro-triggered', event.devicePath, hexKey, macroSteps);
+      this.macroExecutor.executeMacro(macroSteps).catch((err) => {
+        console.error('Macro execution failed:', err);
+      });
+      return;
+    }
+
+    if (assignment.action.type === 'key' && typeof assignment.action.value === 'object' && assignment.action.value !== null) {
+      this.macroExecutor.executeKey(assignment.action.value as KeyActionValue).catch((err) => {
+        console.error('Key execution failed:', err);
+      });
+    }
   }
 
   dispose(): void {

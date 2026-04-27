@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getButtonDefsForDevice, TASK_LABELS, type ButtonDef } from '../../../shared/device-buttons';
-import type { ButtonAssignment, Device, DeviceProfile, MacroAction } from '../../../shared/device-types';
+import type { ButtonAssignment, Device, DeviceProfile, KeyActionValue, MacroAction } from '../../../shared/device-types';
 import { DeviceImage } from './DeviceImage';
 
 interface Props {
@@ -69,7 +69,7 @@ function assignmentLabel(assignment: ButtonAssignment | undefined, def: ButtonDe
   const a = assignment.action;
   if (a.type === 'disabled') return 'Disabled';
   if (a.type === 'key') {
-    const { key, modifiers } = (a.value as unknown) as { key: string; modifiers: string[] };
+    const { key, modifiers } = a.value as KeyActionValue;
     const mods = modifiers.length > 0 ? `${modifiers.join('+')}+` : '';
     return mods + key;
   }
@@ -152,8 +152,6 @@ export function ButtonEditor({ device, activeProfile, onApply, selectedButtonId,
   const applyAction = useCallback((def: ButtonDef, assignment: ButtonAssignment) => {
     const hexKey = def.controlId.toString(16).padStart(4, '0');
     setAssignments((prev) => ({ ...prev, [hexKey]: assignment }));
-    setSelected(null);
-    onSelectButton?.(null);
     setDirty(true);
   }, [onSelectButton]);
 
@@ -190,7 +188,7 @@ export function ButtonEditor({ device, activeProfile, onApply, selectedButtonId,
     if (!pendingKey) return;
     applyAction(def, {
       buttonId: def.controlId.toString(16).padStart(4, '0'),
-      action: { type: 'key', value: { key: pendingKey.key, modifiers: pendingKey.modifiers } as unknown as string },
+      action: { type: 'key', value: { key: pendingKey.key, modifiers: pendingKey.modifiers } },
     });
     setPendingKey(null);
     setCapturing(false);

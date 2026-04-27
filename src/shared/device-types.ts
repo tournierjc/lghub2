@@ -99,9 +99,14 @@ export interface ButtonAssignment {
   action: ButtonAction;
 }
 
+export interface KeyActionValue {
+  key: string;
+  modifiers: string[];
+}
+
 export interface ButtonAction {
   type: 'key' | 'macro' | 'dpi' | 'media' | 'system' | 'disabled';
-  value: string | number | MacroAction[];
+  value: KeyActionValue | number | MacroAction[] | '';
 }
 
 export interface MacroAction {

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Device, DpiConfig, DpiLevel } from '../../../shared/device-types';
+import { useMemo, useState } from 'react';
+import type { Device, DpiConfig, DpiLevel } from '../../../shared/device-types';
 import { getDpiLevelColor, getSupportedDpiValues, normalizeDpiConfig } from '../../../shared/profile-utils';
 
 interface Props {
@@ -21,11 +21,11 @@ export function DpiEditor({ device, onDpiChange, onDpiConfigChange }: Props) {
     return <div className="dpi-editor dpi-editor--unsupported">DPI not supported on this device.</div>;
   }
 
-  const supportedValues = getSupportedDpiValues(dpiConfig);
+  const supportedValues = useMemo(() => getSupportedDpiValues(dpiConfig), [dpiConfig]);
   const cycleValues = dpiConfig.levels.map((level) => level.dpi);
   const availableSupportedValues = supportedValues.filter((value) => !cycleValues.includes(value));
 
-  const handleLevelClick = (level: DpiLevel, index: number) => {
+  const handleLevelClick = (level: DpiLevel, _index: number) => {
     onDpiChange(level.dpi);
   };
 
@@ -37,7 +37,7 @@ export function DpiEditor({ device, onDpiChange, onDpiConfigChange }: Props) {
   const handleEditConfirm = () => {
     if (editingIndex === null) return;
     const dpi = parseInt(editValue, 10);
-    if (!isNaN(dpi) && dpi >= 100 && dpi <= 25600) {
+    if (!Number.isNaN(dpi) && dpi >= 100 && dpi <= 25600) {
       const currentLevel = dpiConfig.levels[editingIndex];
       const nextLevels = dpiConfig.levels.map((level, index) => (
         index === editingIndex ? { ...level, dpi } : level
@@ -115,15 +115,13 @@ export function DpiEditor({ device, onDpiChange, onDpiConfigChange }: Props) {
       >
         {dpiConfig.levels.map((level, index) => (
           <li key={`${level.dpi}-${index}`} className="dpi-editor__level-item">
-            <button
-              type="button"
+            <div
               className={`dpi-editor__level ${level.isActive ? 'dpi-editor__level--active' : ''}`}
               draggable
               onDragStart={() => handleDragStart(level.dpi, 'cycle')}
               onDragEnd={clearDrag}
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => handleDropOnCycle(index)}
-              onClick={() => handleLevelClick(level, index)}
             >
               <div
                 className="dpi-editor__level-indicator"
@@ -134,6 +132,7 @@ export function DpiEditor({ device, onDpiChange, onDpiConfigChange }: Props) {
                   <input
                     className="dpi-editor__level-input"
                     type="number"
+                    autoFocus
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
                     onBlur={handleEditConfirm}
@@ -169,7 +168,7 @@ export function DpiEditor({ device, onDpiChange, onDpiConfigChange }: Props) {
                   backgroundColor: `rgb(${level.color.r}, ${level.color.g}, ${level.color.b})`,
                 }}
               />
-            </button>
+            </div>
           </li>
         ))}
       </ul>
@@ -194,12 +193,9 @@ export function DpiEditor({ device, onDpiChange, onDpiConfigChange }: Props) {
           );
         })}
       </div>
-      <div className="dpi-editor__quick-actions">
-        <button type="button" className="dpi-editor__preset" onClick={() => onDpiChange(400)}>400</button>
-        <button type="button" className="dpi-editor__preset" onClick={() => onDpiChange(800)}>800</button>
-        <button type="button" className="dpi-editor__preset" onClick={() => onDpiChange(1600)}>1600</button>
-        <button type="button" className="dpi-editor__preset" onClick={() => onDpiChange(3200)}>3200</button>
-      </div>
+      {supportedValues.length === 0 && (
+        <div className="dpi-editor__empty-state">No vendor-supported DPI values were detected for drag and drop.</div>
+      )}
     </div>
   );
 }

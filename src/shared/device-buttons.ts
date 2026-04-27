@@ -6,26 +6,26 @@ export interface ButtonDef {
   category: 'primary' | 'scroll' | 'dpi' | 'macro' | 'media' | 'extra';
   defaultTaskId: number;
   remappable: boolean;
-  /** Position on device layout image [x%, y%] */
   layoutPos?: [number, number];
+  layoutAlign?: 'left' | 'right' | 'top' | 'bottom' | 'center';
 }
 
 // G502 HERO (0xc332)
 export const G502_BUTTONS: ButtonDef[] = [
-  { controlId: 0x0050, name: 'Left Click',    category: 'primary', defaultTaskId: 0x0050, remappable: false, layoutPos: [25, 22] },
-  { controlId: 0x0051, name: 'Right Click',   category: 'primary', defaultTaskId: 0x0051, remappable: false, layoutPos: [75, 22] },
-  { controlId: 0x0052, name: 'Middle Click',  category: 'scroll',  defaultTaskId: 0x0052, remappable: true,  layoutPos: [50, 20] },
-  { controlId: 0x00c3, name: 'Back',          category: 'extra',   defaultTaskId: 0x00c3, remappable: true,  layoutPos: [18, 48] },
-  { controlId: 0x00c4, name: 'Forward',       category: 'extra',   defaultTaskId: 0x00c4, remappable: true,  layoutPos: [18, 38] },
-  { controlId: 0x00d7, name: 'DPI Up',        category: 'dpi',     defaultTaskId: 0x00d7, remappable: true,  layoutPos: [38, 62] },
-  { controlId: 0x00d8, name: 'DPI Down',      category: 'dpi',     defaultTaskId: 0x00d8, remappable: true,  layoutPos: [38, 72] },
-  { controlId: 0x00c2, name: 'DPI Cycle',     category: 'dpi',     defaultTaskId: 0x00c2, remappable: true,  layoutPos: [28, 67] },
-  { controlId: 0x00d0, name: 'G4',            category: 'macro',   defaultTaskId: 0x0000, remappable: true,  layoutPos: [82, 48] },
-  { controlId: 0x00d4, name: 'G5',            category: 'macro',   defaultTaskId: 0x0000, remappable: true,  layoutPos: [82, 38] },
-  { controlId: 0x00d9, name: 'G-Shift',       category: 'extra',   defaultTaskId: 0x00d9, remappable: true,  layoutPos: [28, 58] },
-  { controlId: 0x00d6, name: 'Smart Shift',   category: 'scroll',  defaultTaskId: 0x00d6, remappable: true,  layoutPos: [50, 30] },
-  { controlId: 0x00b5, name: 'Scroll Up',     category: 'scroll',  defaultTaskId: 0x00b5, remappable: false, layoutPos: [50, 15] },
-  { controlId: 0x00b6, name: 'Scroll Down',   category: 'scroll',  defaultTaskId: 0x00b6, remappable: false, layoutPos: [50, 25] },
+  { controlId: 0x0050, name: 'Left Click',    category: 'primary', defaultTaskId: 0x0050, remappable: false, layoutPos: [31, 17], layoutAlign: 'top' },
+  { controlId: 0x0051, name: 'Right Click',   category: 'primary', defaultTaskId: 0x0051, remappable: false, layoutPos: [69, 17], layoutAlign: 'top' },
+  { controlId: 0x0052, name: 'Middle Click',  category: 'scroll',  defaultTaskId: 0x0052, remappable: true,  layoutPos: [50, 29], layoutAlign: 'right' },
+  { controlId: 0x00c3, name: 'Back',          category: 'extra',   defaultTaskId: 0x00c3, remappable: true,  layoutPos: [19, 46], layoutAlign: 'left' },
+  { controlId: 0x00c4, name: 'Forward',       category: 'extra',   defaultTaskId: 0x00c4, remappable: true,  layoutPos: [23, 39], layoutAlign: 'left' },
+  { controlId: 0x00d7, name: 'DPI Up',        category: 'dpi',     defaultTaskId: 0x00d7, remappable: true,  layoutPos: [35, 51], layoutAlign: 'left' },
+  { controlId: 0x00d8, name: 'DPI Down',      category: 'dpi',     defaultTaskId: 0x00d8, remappable: true,  layoutPos: [37, 58], layoutAlign: 'left' },
+  { controlId: 0x00c2, name: 'DPI Cycle',     category: 'dpi',     defaultTaskId: 0x00c2, remappable: true,  layoutPos: [29, 54], layoutAlign: 'left' },
+  { controlId: 0x00d0, name: 'G4',            category: 'macro',   defaultTaskId: 0x0000, remappable: true,  layoutPos: [78, 43], layoutAlign: 'right' },
+  { controlId: 0x00d4, name: 'G5',            category: 'macro',   defaultTaskId: 0x0000, remappable: true,  layoutPos: [82, 37], layoutAlign: 'right' },
+  { controlId: 0x00d9, name: 'G-Shift',       category: 'extra',   defaultTaskId: 0x00d9, remappable: true,  layoutPos: [29, 47], layoutAlign: 'left' },
+  { controlId: 0x00d6, name: 'Smart Shift',   category: 'scroll',  defaultTaskId: 0x00d6, remappable: true,  layoutPos: [50, 20], layoutAlign: 'right' },
+  { controlId: 0x00b5, name: 'Scroll Up',     category: 'scroll',  defaultTaskId: 0x00b5, remappable: false, layoutPos: [50, 11], layoutAlign: 'right' },
+  { controlId: 0x00b6, name: 'Scroll Down',   category: 'scroll',  defaultTaskId: 0x00b6, remappable: false, layoutPos: [50, 35], layoutAlign: 'right' },
 ];
 
 // G513 RGB Mechanical Keyboard (0xc33c)

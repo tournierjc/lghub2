@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { RootState } from './store';
+import type { RootState } from './store';
 import { useAppDispatch } from './hooks/use-store';
 import { TitleBar } from './components/layout/TitleBar';
 import { Sidebar } from './components/layout/Sidebar';
@@ -15,8 +15,8 @@ export function App() {
   const currentPage = useSelector((state: RootState) => state.app.currentPage);
 
   useEffect(() => {
-    const unsub = window.profile.onProfileSwitched((modelId, profileId) => {
-      dispatch(profileAutoSwitched({ modelId, profileId }));
+    const unsub = window.profile.onProfileSwitched((modelId, profileId, app) => {
+      dispatch(profileAutoSwitched({ modelId, profileId, app }));
     });
     return () => { unsub(); };
   }, [dispatch]);

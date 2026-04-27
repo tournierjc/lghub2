@@ -1,10 +1,9 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { MacroAction } from '../../shared/device-types';
+import type { KeyActionValue, MacroAction } from '../../shared/device-types';
 
 const execAsync = promisify(exec);
 
-// Linux input event keycode → xdotool key name mapping
 const LINUX_KEYCODE_MAP: Record<number, string> = {
   1: 'Escape',
   2: '1',
@@ -119,6 +118,44 @@ const LINUX_KEYCODE_MAP: Record<number, string> = {
 
 export class MacroExecutor {
   private xdotoolAvailable: boolean | null = null;
+  private readonly modifierMap: Record<string, string> = {
+    Ctrl: 'ctrl',
+    Alt: 'alt',
+    Shift: 'shift',
+    Meta: 'super',
+  };
+
+  private readonly keyMap: Record<string, string> = {
+    Enter: 'Return',
+    Backspace: 'BackSpace',
+    Escape: 'Escape',
+    ' ': 'space',
+    ArrowUp: 'Up',
+    ArrowDown: 'Down',
+    ArrowLeft: 'Left',
+    ArrowRight: 'Right',
+    PageUp: 'Prior',
+    PageDown: 'Next',
+    '-': 'minus',
+    '=': 'equal',
+  };
+
+  async executeKey(keyAction: KeyActionValue): Promise<void> {
+    if (process.platform !== 'linux') {
+      console.warn('Key execution is only supported on Linux via xdotool');
+      return;
+    }
+
+    const available = await this.isXdotoolAvailable();
+    if (!available) {
+      console.warn('xdotool is not installed. Key assignments cannot be executed. Install xdotool to enable button playback.');
+      return;
+    }
+
+    const keyName = this.keyMap[keyAction.key] ?? keyAction.key;
+    const combo = [...keyAction.modifiers.map((modifier) => this.modifierMap[modifier] ?? modifier.toLowerCase()), keyName].join('+');
+    await execAsync(`xdotool key ${combo}`);
+  }
 
   async executeMacro(steps: MacroAction[]): Promise<void> {
     if (process.platform !== 'linux') {

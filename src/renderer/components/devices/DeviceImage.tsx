@@ -1,6 +1,5 @@
-import React from 'react';
 import { DeviceType } from '../../../shared/device-types';
-import { ButtonDef } from '../../../shared/device-buttons';
+import type { ButtonDef } from '../../../shared/device-buttons';
 
 interface Props {
   modelId: string;
@@ -13,7 +12,7 @@ interface Props {
 
 function G502Svg({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 200 260" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg className={className} viewBox="0 0 200 260" preserveAspectRatio="none" fill="none" xmlns="http://www.w3.org/2000/svg">
       <title>G502 device image</title>
       <path d="M60 30 C45 30 30 50 28 80 L20 180 C18 220 40 250 70 250 L130 250 C160 250 182 220 180 180 L172 80 C170 50 155 30 140 30 Z" fill="#1a1a2e" stroke="#333" strokeWidth="2"/>
       <path d="M60 30 L100 30 L100 110 L60 115 Z" fill="#0f0f1e" stroke="#444" strokeWidth="1"/>
@@ -32,7 +31,7 @@ function G502Svg({ className }: { className?: string }) {
 
 function G513Svg({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 380 140" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg className={className} viewBox="0 0 380 140" preserveAspectRatio="none" fill="none" xmlns="http://www.w3.org/2000/svg">
       <title>G513 device image</title>
       <rect x="8" y="8" width="364" height="124" rx="8" fill="#1a1a2e" stroke="#333" strokeWidth="2"/>
       <rect x="8" y="8" width="32" height="124" rx="6" fill="#111" stroke="#2a2a3e" strokeWidth="1"/>
@@ -51,26 +50,12 @@ function G513Svg({ className }: { className?: string }) {
 
 function GenericMouseSvg({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 180 240" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg className={className} viewBox="0 0 180 240" preserveAspectRatio="none" fill="none" xmlns="http://www.w3.org/2000/svg">
       <title>Generic mouse image</title>
       <path d="M50 30 C35 30 22 55 20 85 L15 175 C12 215 38 240 65 240 L115 240 C142 240 168 215 165 175 L160 85 C158 55 145 30 130 30 Z" fill="#1a1a2e" stroke="#333" strokeWidth="2"/>
       <path d="M50 30 L90 30 L90 100 L50 105 Z" fill="#0f0f1e" stroke="#444" strokeWidth="1"/>
       <path d="M130 30 L90 30 L90 100 L130 105 Z" fill="#0f0f1e" stroke="#444" strokeWidth="1"/>
       <ellipse cx="90" cy="85" rx="10" ry="22" fill="#222" stroke="#555" strokeWidth="1"/>
-    </svg>
-  );
-}
-
-function GenericKeyboardSvg({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 340 120" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <title>Generic keyboard image</title>
-      <rect x="6" y="6" width="328" height="108" rx="8" fill="#1a1a2e" stroke="#333" strokeWidth="2"/>
-      {Array.from({ length: 12 }, (_, col) => col).map((col) => (
-        Array.from({ length: 4 }, (_, row) => row).map((row) => (
-          <rect key={`gkey-${col}-${row}`} x={18 + col * 26} y={18 + row * 22} width="22" height="16" rx="3" fill="#181825" stroke="#2a2a3e" strokeWidth="0.5"/>
-        ))
-      ))}
     </svg>
   );
 }
@@ -90,11 +75,12 @@ export function DeviceImage({ modelId, deviceType, className, buttons, selectedB
               const buttonId = button.controlId.toString(16).padStart(4, '0');
               const [x, y] = button.layoutPos as [number, number];
               const isSelected = selectedId === buttonId;
+              const alignClass = button.layoutAlign ? `device-image__button--${button.layoutAlign}` : 'device-image__button--right';
               return (
                 <button
                   key={buttonId}
                   type="button"
-                  className={`device-image__button ${isSelected ? 'device-image__button--selected' : ''}`}
+                  className={`device-image__button ${alignClass} ${isSelected ? 'device-image__button--selected' : ''}`}
                   style={{ left: `${x}%`, top: `${y}%` }}
                   title={button.name}
                   aria-pressed={isSelected}
@@ -121,11 +107,12 @@ export function DeviceImage({ modelId, deviceType, className, buttons, selectedB
               const buttonId = button.controlId.toString(16).padStart(4, '0');
               const [x, y] = button.layoutPos as [number, number];
               const isSelected = selectedId === buttonId;
+              const alignClass = button.layoutAlign ? `device-image__button--${button.layoutAlign}` : 'device-image__button--top';
               return (
                 <button
                   key={buttonId}
                   type="button"
-                  className={`device-image__button ${isSelected ? 'device-image__button--selected' : ''}`}
+                  className={`device-image__button ${alignClass} ${isSelected ? 'device-image__button--selected' : ''}`}
                   style={{ left: `${x}%`, top: `${y}%` }}
                   title={button.name}
                   aria-pressed={isSelected}

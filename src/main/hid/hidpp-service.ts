@@ -20,8 +20,7 @@ const ONBOARD_PROFILE_DPI_SLOT_COUNT = 5;
 const ONBOARD_PROFILE_DISABLED_DPI = 0xffff;
 const ONBOARD_PROFILE_DEFAULT_DPI_OFFSET = 1;
 const ONBOARD_PROFILE_SWITCHED_DPI_OFFSET = 2;
-const ONBOARD_PROFILE_CURRENT_DPI_OFFSET = 3;
-const ONBOARD_PROFILE_DPI_LIST_OFFSET = 4;
+const ONBOARD_PROFILE_DPI_LIST_OFFSET = 3;
 const ONBOARD_PROFILE_MEMORY_CHUNK_SIZE = 16;
 const LIGHTING_SPEED_UI_MAX = 100;
 const COLOR_LED_EFFECT_MIN_PERIOD = 150;
@@ -333,8 +332,6 @@ export class HidppService extends EventEmitter {
     const countParsed = parseHidppMessage(countResp);
     if (!countParsed) return null;
 
-    const sensorCount = countParsed.params[0];
-
     // GetSensorDPI (function 0x01) — sensor 0
     const dpiResp = this.sendRequest(devicePath, proto.deviceIndex, feature.featureIndex, 0x01, [0x00]);
     if (!dpiResp) return null;
@@ -356,20 +353,34 @@ export class HidppService extends EventEmitter {
     let min = 0xffff;
     let max = 0;
     let step = 0;
+    let lastExplicitValue: number | null = null;
 
-    // DPI list: pairs of bytes (big-endian), 0xe000+ means step-based encoding
+    // DPI list: pairs of bytes (big-endian), 0xe001+ means hyphen/range step encoding.
     for (let i = 1; i < listParsed.params.length - 1; i += 2) {
       const value = (listParsed.params[i] << 8) | listParsed.params[i + 1];
       if (value === 0) break;
 
-      if (value >= 0xe000) {
-        step = value - 0xe000;
+      if (value > 0xe000) {
+        step = value & 0x1fff;
+        const nextValue = i + 3 < listParsed.params.length
+          ? (listParsed.params[i + 2] << 8) | listParsed.params[i + 3]
+          : 0;
+        if (lastExplicitValue !== null && nextValue > 0 && step > 0) {
+          for (let generated = lastExplicitValue + step; generated <= nextValue; generated += step) {
+            dpiValues.push(generated);
+            if (generated < min) min = generated;
+            if (generated > max) max = generated;
+          }
+          lastExplicitValue = nextValue;
+          i += 2;
+        }
         continue;
       }
 
       dpiValues.push(value);
       if (value < min) min = value;
       if (value > max) max = value;
+      lastExplicitValue = value;
     }
 
     return {
@@ -688,7 +699,6 @@ export class HidppService extends EventEmitter {
 
     nextSector[ONBOARD_PROFILE_DEFAULT_DPI_OFFSET] = defaultIndex;
     nextSector[ONBOARD_PROFILE_SWITCHED_DPI_OFFSET] = switchedIndex;
-    nextSector[ONBOARD_PROFILE_CURRENT_DPI_OFFSET] = activeIndex;
 
     for (let index = 0; index < ONBOARD_PROFILE_DPI_SLOT_COUNT; index++) {
       const dpi = levelValues[index] ?? ONBOARD_PROFILE_DISABLED_DPI;
@@ -721,7 +731,7 @@ export class HidppService extends EventEmitter {
     if (levels.length === 0) return null;
 
     const defaultSlotIndex = sector[ONBOARD_PROFILE_DEFAULT_DPI_OFFSET] ?? 0;
-    const activeSlotIndex = currentDpiSlotIndex ?? sector[ONBOARD_PROFILE_CURRENT_DPI_OFFSET] ?? defaultSlotIndex;
+    const activeSlotIndex = currentDpiSlotIndex ?? defaultSlotIndex;
     const activeLevelIndex = slotToLevelIndex.get(activeSlotIndex) ?? slotToLevelIndex.get(defaultSlotIndex) ?? 0;
     const defaultLevelIndex = slotToLevelIndex.get(defaultSlotIndex) ?? activeLevelIndex;
 

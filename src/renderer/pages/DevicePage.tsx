@@ -11,7 +11,7 @@ import { ButtonEditor } from '../components/devices/ButtonEditor';
 import { EqEditor } from '../components/devices/EqEditor';
 import { DeviceImage } from '../components/devices/DeviceImage';
 import { LightingEffect } from '../../shared/device-types';
-import type { Device, DeviceProfile, LightingConfig, ButtonAssignment, DpiConfig } from '../../shared/device-types';
+import type { ButtonAssignment, Device, DeviceProfile, DpiConfig, LightingConfig } from '../../shared/device-types';
 
 type DeviceTab = 'dpi' | 'lighting' | 'assignments' | 'equalizer' | 'apps';
 
@@ -120,6 +120,10 @@ export function DevicePage() {
       profileId: activeProfile.id,
       updates: { dpi },
     }));
+    const activeLevel = dpi.levels[dpi.activeLevelIndex] ?? dpi.levels.find((level) => level.isActive) ?? dpi.levels[0];
+    if (activeLevel) {
+      dispatch(setDeviceDpi({ hidPath: device.hidPath, dpi: activeLevel.dpi }));
+    }
   }, [device, activeProfile, dispatch]);
 
   const handleLightingChange = useCallback((config: LightingConfig) => {
@@ -166,6 +170,8 @@ export function DevicePage() {
       const action = assignment.action;
       if (action.type === 'system' || action.type === 'dpi' || action.type === 'media') {
         await window.device.remapButton(device.hidPath, controlId, action.value as number);
+      } else if (action.type === 'disabled') {
+        await window.device.remapButton(device.hidPath, controlId, 0);
       }
     }
     dispatch(updateProfile({
@@ -424,15 +430,17 @@ export function DevicePage() {
               <h3 className="app-profiles__label">Auto-switch for profile: {activeProfile?.name}</h3>
               {activeProfile?.applicationPath ? (
                 <div className="app-profiles__assigned">
-                  <span className="app-profiles__app-name">{activeProfile.applicationName || activeProfile.applicationPath}</span>
-                  {allDetectionExecutables.length > 0 && (
-                    <span className="app-profiles__app-name">
-                      Binary{allDetectionExecutables.length > 1 ? 'ies' : ''}: {allDetectionExecutables.join(', ')}
-                    </span>
-                  )}
-                  {assignedBinaryName && !allDetectionExecutables.includes(assignedBinaryName) && (
-                    <span className="app-profiles__app-name">Custom binary: {assignedBinaryName}</span>
-                  )}
+                  <div className="app-profiles__assigned-meta">
+                    <span className="app-profiles__app-name">{activeProfile.applicationName || activeProfile.applicationPath}</span>
+                    {allDetectionExecutables.length > 0 && (
+                      <span className="app-profiles__app-name">
+                        Binary{allDetectionExecutables.length > 1 ? 'ies' : ''}: {allDetectionExecutables.join(', ')}
+                      </span>
+                    )}
+                    {assignedBinaryName && !allDetectionExecutables.includes(assignedBinaryName) && (
+                      <span className="app-profiles__app-name">Custom binary: {assignedBinaryName}</span>
+                    )}
+                  </div>
                   <button type="button" className="app-profiles__remove-btn" onClick={handleUnassignApp}>Remove</button>
                 </div>
               ) : (

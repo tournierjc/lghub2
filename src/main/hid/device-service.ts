@@ -265,6 +265,7 @@ export class DeviceService {
   }
 
   private buildDpiConfig(dpiInfo: HidppDpiInfo, supportedDpiInfo?: HidppDpiInfo): DpiConfig {
+    const supportedValues = this.resolveSupportedDpiValues(supportedDpiInfo ?? dpiInfo, dpiInfo);
     const levels = dpiInfo.levels.length > 0
       ? dpiInfo.levels.map((dpi, idx) => ({
           dpi,
@@ -278,10 +279,26 @@ export class DeviceService {
 
     return {
       levels,
-      supportedValues: [...(supportedDpiInfo?.levels ?? dpiInfo.levels)],
+      supportedValues,
       activeLevelIndex: dpiInfo.activeLevelIndex >= 0 ? dpiInfo.activeLevelIndex : 0,
       defaultDpi,
     };
+  }
+
+  private resolveSupportedDpiValues(primaryInfo: HidppDpiInfo, fallbackInfo: HidppDpiInfo): number[] {
+    const dedupe = (values: number[]) => [...new Set(values.filter((value) => value >= 100 && value <= 25600))];
+    const primaryValues = dedupe(primaryInfo.levels);
+    if (primaryValues.length > 0 && this.looksLikeReasonableSupportedDpiList(primaryValues)) {
+      return primaryValues;
+    }
+
+    const fallbackValues = dedupe(fallbackInfo.levels);
+    return this.looksLikeReasonableSupportedDpiList(fallbackValues) ? fallbackValues : [];
+  }
+
+  private looksLikeReasonableSupportedDpiList(values: number[]): boolean {
+    if (values.length === 0) return false;
+    return values.every((value) => value >= 100 && value <= 25600) && values.some((value) => value % 50 === 0);
   }
 
   getDevice(hidPath: string): Device | undefined {
@@ -346,6 +363,7 @@ export class DeviceService {
   applyProfileAssignments(hidPath: string, assignments: Record<string, import('../../shared/device-types').ButtonAssignment>): void {
     const device = this.managedDevices.get(hidPath);
     if (!device) return;
+    this.macroRuntime.deactivateDevice(hidPath);
     device.activeProfile.assignments = { ...assignments };
     this.macroRuntime.activateProfile(hidPath, device.activeProfile);
   }

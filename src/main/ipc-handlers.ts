@@ -181,6 +181,13 @@ export function registerIpcHandlers(window: BrowserWindow, hidManager: HidManage
       }
     }
 
+    if (profile && updates.assignments !== undefined) {
+      const device = deviceService.getAllDevices().find((d) => d.modelId === modelId);
+      if (device?.activeProfile?.id === profileId) {
+        deviceService.applyProfileAssignments(device.hidPath, updates.assignments);
+      }
+    }
+
     return profile;
   });
 
