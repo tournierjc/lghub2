@@ -58,9 +58,37 @@ function mergeSupportedDpiValues(storedDpi?: DpiConfig, scannedDpi?: DpiConfig):
   return values ? [...new Set(values)] : undefined;
 }
 
+function isReasonableDpiValue(value: number): boolean {
+  return Number.isFinite(value) && value >= 100 && value <= 25600 && value % 50 === 0;
+}
+
+function hasReasonableDpiLevels(dpi?: DpiConfig): boolean {
+  if (!dpi) return false;
+  if (!Array.isArray(dpi.levels) || dpi.levels.length === 0) return false;
+  return dpi.levels.every((l) => isReasonableDpiValue(l.dpi));
+}
+
 export function mergeProfileDpi(storedDpi?: DpiConfig, scannedDpi?: DpiConfig): DpiConfig | undefined {
   if (!storedDpi) return scannedDpi;
   if (!scannedDpi) return storedDpi;
+
+  const storedOk = hasReasonableDpiLevels(storedDpi);
+  const scannedOk = hasReasonableDpiLevels(scannedDpi);
+
+  // If one side looks corrupted (common when onboard profile parsing was wrong),
+  // prefer the other side so the UI doesn't show garbage DPI cycle entries.
+  if (!storedOk && scannedOk) {
+    return {
+      ...scannedDpi,
+      supportedValues: mergeSupportedDpiValues(storedDpi, scannedDpi),
+    };
+  }
+  if (storedOk && !scannedOk) {
+    return {
+      ...storedDpi,
+      supportedValues: mergeSupportedDpiValues(storedDpi, scannedDpi),
+    };
+  }
 
   const merged = scannedDpi.levels.length > storedDpi.levels.length ? scannedDpi : storedDpi;
   return {
