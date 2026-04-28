@@ -35,14 +35,14 @@ export class HidManager extends EventEmitter {
       }));
   }
 
-  connect(devicePath: string): boolean {
+  connect(devicePath: string, deviceInfo?: HidDeviceInfo): boolean {
     if (this.connectedDevices.has(devicePath)) {
       return true;
     }
 
     try {
       const device = new HID.HID(devicePath);
-      const info = this.enumerate().find((d) => d.path === devicePath);
+      const info = deviceInfo ?? this.enumerate().find((d) => d.path === devicePath);
 
       if (!info) return false;
 

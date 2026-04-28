@@ -47,7 +47,7 @@ export class DeviceService {
         continue;
       }
 
-      const connected = this.hidManager.connect(hidDevice.path);
+      const connected = this.hidManager.connect(hidDevice.path, hidDevice);
       if (!connected) {
         const basicDevice = this.buildBasicDevice(hidDevice);
         this.managedDevices.set(hidDevice.path, basicDevice);
@@ -149,9 +149,8 @@ export class DeviceService {
     const deviceType = this.inferDeviceType(knownInfo?.type, hidDevice);
     const firmware = this.hidppService.getFirmwareVersion(hidDevice.path);
     const battery = this.hidppService.getBatteryStatus(hidDevice.path);
-    const onboardDpiInfo = this.hidppService.getActiveOnboardProfileDpiInfo(hidDevice.path);
     const vendorDpiInfo = this.hidppService.getDpiInfo(hidDevice.path);
-    const dpiInfo = onboardDpiInfo ?? vendorDpiInfo;
+    const dpiInfo = vendorDpiInfo;
     const rgbInfo = this.hidppService.getRgbEffectInfo(hidDevice.path);
     const keysInfo = this.hidppService.getSpecialKeys(hidDevice.path);
 
@@ -295,13 +294,16 @@ export class DeviceService {
 
   private resolveSupportedDpiValues(primaryInfo: HidppDpiInfo, fallbackInfo: HidppDpiInfo): number[] {
     const dedupe = (values: number[]) => [...new Set(values.filter((value) => value >= 100 && value <= 25600))];
-    const primaryValues = dedupe(primaryInfo.levels);
+    const primaryValues = dedupe([...primaryInfo.levels, primaryInfo.current, primaryInfo.defaultDpi]);
     if (primaryValues.length > 0 && this.looksLikeReasonableSupportedDpiList(primaryValues)) {
       return primaryValues;
     }
 
-    const fallbackValues = dedupe(fallbackInfo.levels);
-    return this.looksLikeReasonableSupportedDpiList(fallbackValues) ? fallbackValues : [];
+    const fallbackValues = dedupe([...fallbackInfo.levels, fallbackInfo.current, fallbackInfo.defaultDpi]);
+    if (this.looksLikeReasonableSupportedDpiList(fallbackValues)) return fallbackValues;
+
+    const lastResort = dedupe([primaryInfo.current, primaryInfo.defaultDpi, fallbackInfo.current, fallbackInfo.defaultDpi]);
+    return lastResort;
   }
 
   private looksLikeReasonableSupportedDpiList(values: number[]): boolean {

@@ -349,39 +349,65 @@ export class HidppService extends EventEmitter {
     const listParsed = parseHidppMessage(listResp);
     if (!listParsed) return null;
 
-    const dpiValues: number[] = [];
-    let min = 0xffff;
-    let max = 0;
-    let step = 0;
-    let lastExplicitValue: number | null = null;
+    const parseDpiList = (startIndex: number) => {
+      const values: number[] = [];
+      let minValue = 0xffff;
+      let maxValue = 0;
+      let stepValue = 0;
+      let lastExplicitValue: number | null = null;
 
-    // DPI list: pairs of bytes (big-endian), 0xe001+ means hyphen/range step encoding.
-    for (let i = 1; i < listParsed.params.length - 1; i += 2) {
-      const value = (listParsed.params[i] << 8) | listParsed.params[i + 1];
-      if (value === 0) break;
+      // DPI list: pairs of bytes (big-endian). Some firmwares include a leading sensor index byte;
+      // others appear to start immediately with values. Try both and pick the best result.
+      for (let i = startIndex; i < listParsed.params.length - 1; i += 2) {
+        const value = (listParsed.params[i] << 8) | listParsed.params[i + 1];
+        if (value === 0) break;
 
-      if (value > 0xe000) {
-        step = value & 0x1fff;
-        const nextValue = i + 3 < listParsed.params.length
-          ? (listParsed.params[i + 2] << 8) | listParsed.params[i + 3]
-          : 0;
-        if (lastExplicitValue !== null && nextValue > 0 && step > 0) {
-          for (let generated = lastExplicitValue + step; generated <= nextValue; generated += step) {
-            dpiValues.push(generated);
-            if (generated < min) min = generated;
-            if (generated > max) max = generated;
+        // 0xe001+ means hyphen/range step encoding.
+        if (value > 0xe000) {
+          stepValue = value & 0x1fff;
+          const nextValue = i + 3 < listParsed.params.length
+            ? (listParsed.params[i + 2] << 8) | listParsed.params[i + 3]
+            : 0;
+          if (lastExplicitValue !== null && nextValue > 0 && stepValue > 0) {
+            for (let generated = lastExplicitValue + stepValue; generated <= nextValue; generated += stepValue) {
+              values.push(generated);
+              if (generated < minValue) minValue = generated;
+              if (generated > maxValue) maxValue = generated;
+            }
+            lastExplicitValue = nextValue;
+            i += 2;
           }
-          lastExplicitValue = nextValue;
-          i += 2;
+          continue;
         }
-        continue;
+
+        values.push(value);
+        if (value < minValue) minValue = value;
+        if (value > maxValue) maxValue = value;
+        lastExplicitValue = value;
       }
 
-      dpiValues.push(value);
-      if (value < min) min = value;
-      if (value > max) max = value;
-      lastExplicitValue = value;
-    }
+      const reasonable = values.filter((v) => v >= 100 && v <= 25600 && v % 50 === 0);
+      return {
+        values: reasonable,
+        min: reasonable.length ? Math.min(...reasonable) : minValue,
+        max: reasonable.length ? Math.max(...reasonable) : maxValue,
+        step: stepValue,
+      };
+    };
+
+    const parsedFrom1 = parseDpiList(1);
+    const parsedFrom0 = parseDpiList(0);
+    const best = parsedFrom1.values.length >= parsedFrom0.values.length ? parsedFrom1 : parsedFrom0;
+
+    const withCurrent = [best.values, [currentDpi, defaultDpi]]
+      .flat()
+      .filter((v) => v >= 100 && v <= 25600);
+    const deduped = [...new Set(withCurrent)].sort((a, b) => a - b);
+
+    const min = deduped.length ? Math.min(...deduped) : currentDpi;
+    const max = deduped.length ? Math.max(...deduped) : currentDpi;
+    const step = best.step;
+    const dpiValues = deduped;
 
     return {
       current: currentDpi,
