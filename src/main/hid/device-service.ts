@@ -266,21 +266,29 @@ export class DeviceService {
 
   private buildDpiConfig(dpiInfo: HidppDpiInfo, supportedDpiInfo?: HidppDpiInfo): DpiConfig {
     const supportedValues = this.resolveSupportedDpiValues(supportedDpiInfo ?? dpiInfo, dpiInfo);
-    const levels = dpiInfo.levels.length > 0
-      ? dpiInfo.levels.map((dpi, idx) => ({
-          dpi,
-          color: getDpiLevelColor(idx),
-          isActive: idx === dpiInfo.activeLevelIndex || (dpiInfo.activeLevelIndex < 0 && dpi === dpiInfo.current),
-        }))
-      : [{ dpi: dpiInfo.current, color: { r: 0, g: 212, b: 255 }, isActive: true }];
+    const filteredCycle = dpiInfo.levels
+      .filter((value) => Number.isFinite(value) && value >= 100 && value <= 25600)
+      // Logitech devices typically use 50 DPI granularity; ignoring odd values prevents garbage lists.
+      .filter((value) => value % 50 === 0);
+
+    const cycleValues = filteredCycle.length > 0 ? filteredCycle : [dpiInfo.current];
+    const activeDpi = cycleValues.includes(dpiInfo.current) ? dpiInfo.current : cycleValues[0];
+
+    const levels = cycleValues.map((dpi, idx) => ({
+      dpi,
+      color: getDpiLevelColor(idx),
+      isActive: dpi === activeDpi,
+    }));
+
+    const activeLevelIndex = Math.max(0, levels.findIndex((level) => level.isActive));
     const defaultDpi = levels.some((level) => level.dpi === dpiInfo.defaultDpi)
       ? dpiInfo.defaultDpi
-      : dpiInfo.current;
+      : levels[activeLevelIndex]?.dpi ?? activeDpi;
 
     return {
       levels,
       supportedValues,
-      activeLevelIndex: dpiInfo.activeLevelIndex >= 0 ? dpiInfo.activeLevelIndex : 0,
+      activeLevelIndex,
       defaultDpi,
     };
   }
