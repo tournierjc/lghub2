@@ -73,10 +73,17 @@ export function mergeProfileStateWithScanned(
   profile: DeviceProfile,
   scannedState: Partial<Pick<DeviceProfile, 'dpi' | 'lighting' | 'assignments'>>,
 ): DeviceProfile {
+  const mergedAssignments = scannedState.assignments
+    ? {
+        ...(profile.assignments || {}),
+        ...scannedState.assignments,
+      }
+    : profile.assignments;
+
   return {
     ...profile,
     dpi: mergeProfileDpi(profile.dpi, scannedState.dpi),
     lighting: profile.lighting ?? scannedState.lighting,
-    assignments: profile.assignments ?? scannedState.assignments,
+    assignments: mergedAssignments ?? scannedState.assignments,
   };
 }

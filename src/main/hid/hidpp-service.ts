@@ -703,8 +703,9 @@ export class HidppService extends EventEmitter {
     for (let index = 0; index < ONBOARD_PROFILE_DPI_SLOT_COUNT; index++) {
       const dpi = levelValues[index] ?? ONBOARD_PROFILE_DISABLED_DPI;
       const dpiOffset = ONBOARD_PROFILE_DPI_LIST_OFFSET + (index * 2);
-      nextSector[dpiOffset] = dpi & 0xff;
-      nextSector[dpiOffset + 1] = (dpi >> 8) & 0xff;
+      // Onboard profile sectors store DPI as big-endian (high byte first).
+      nextSector[dpiOffset] = (dpi >> 8) & 0xff;
+      nextSector[dpiOffset + 1] = dpi & 0xff;
     }
 
     const crc = this.computeLogitechCrcCcitt(nextSector.subarray(0, sectorSize - 2));
@@ -719,7 +720,8 @@ export class HidppService extends EventEmitter {
 
     for (let slotIndex = 0; slotIndex < ONBOARD_PROFILE_DPI_SLOT_COUNT; slotIndex++) {
       const dpiOffset = ONBOARD_PROFILE_DPI_LIST_OFFSET + (slotIndex * 2);
-      const rawDpi = sector[dpiOffset] | (sector[dpiOffset + 1] << 8);
+      // Onboard profile sectors store DPI as big-endian (high byte first).
+      const rawDpi = (sector[dpiOffset] << 8) | sector[dpiOffset + 1];
       if (rawDpi === ONBOARD_PROFILE_DISABLED_DPI || rawDpi === 0) {
         continue;
       }

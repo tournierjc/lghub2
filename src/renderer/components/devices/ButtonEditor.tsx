@@ -115,7 +115,6 @@ export function ButtonEditor({ device, activeProfile, onApply, selectedButtonId,
   useEffect(() => {
     setAssignments(buildAssignmentsFromDefs(defs, activeProfile.assignments));
     setDirty(false);
-    setSelected(null);
   }, [defs, activeProfile.assignments]);
 
   useEffect(() => {
