@@ -96,13 +96,13 @@ export class HidManager extends EventEmitter {
     }
   }
 
-  send(devicePath: string, data: number[]): number[] | null {
+  send(devicePath: string, data: number[], timeoutMs: number = 1000): number[] | null {
     const connected = this.connectedDevices.get(devicePath);
     if (!connected) return null;
 
     try {
       connected.device.write(data);
-      const response = connected.device.readTimeout(1000);
+      const response = connected.device.readTimeout(timeoutMs);
       return response ? Array.from(response) : null;
     } catch (err) {
       console.error(`Failed to send to device [${devicePath}]:`, err);

@@ -122,6 +122,16 @@ function requestQuit(): void {
 process.on('SIGINT', requestQuit);
 process.on('SIGTERM', requestQuit);
 
+process.on('uncaughtException', (err) => {
+  // During shutdown, node-hid can occasionally throw an N-API error as handles close.
+  // If we're already quitting, prefer a clean exit over a crash stacktrace.
+  if (isQuitting && err?.name === 'Error' && String((err as Error).message || '').includes('Napi::Error')) {
+    try { process.exit(0); } catch {}
+    return;
+  }
+  throw err;
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();

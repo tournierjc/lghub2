@@ -89,7 +89,8 @@ export class HidppService extends EventEmitter {
     deviceIndex: number,
     featureIndex: number,
     functionId: number,
-    params: number[] = []
+    params: number[] = [],
+    timeoutMs: number = 1000,
   ): number[] | null {
     const msg: HidppMessage = {
       reportType: params.length <= 3 ? HidppReportType.SHORT : HidppReportType.LONG,
@@ -100,7 +101,7 @@ export class HidppService extends EventEmitter {
       params,
     };
 
-    const response = this.hidManager.send(devicePath, buildHidppMessage(msg));
+    const response = this.hidManager.send(devicePath, buildHidppMessage(msg), timeoutMs);
     if (!response) return null;
 
     const error = isHidppError(response);
@@ -123,7 +124,7 @@ export class HidppService extends EventEmitter {
     };
 
     // Ping root feature to get protocol version
-    const rootResponse = this.sendRequest(devicePath, deviceIndex, 0x00, 0x01, [0x00, 0x00, 0x00]);
+    const rootResponse = this.sendRequest(devicePath, deviceIndex, 0x00, 0x01, [0x00, 0x00, 0x00], 200);
     if (rootResponse) {
       const parsed = parseHidppMessage(rootResponse);
       if (parsed) {
@@ -175,7 +176,7 @@ export class HidppService extends EventEmitter {
       (featureId >> 8) & 0xff,
       featureId & 0xff,
       0x00,
-    ]);
+    ], 200);
 
     if (!response) return null;
 
@@ -326,30 +327,39 @@ export class HidppService extends EventEmitter {
     if (!feature) return null;
 
     // GetSensorCount (function 0x00)
-    const countResp = this.sendRequest(devicePath, proto.deviceIndex, feature.featureIndex, 0x00);
+    const countResp = this.sendRequest(devicePath, proto.deviceIndex, feature.featureIndex, 0x00, [], 300);
     if (!countResp) return null;
 
     const countParsed = parseHidppMessage(countResp);
     if (!countParsed) return null;
 
     // GetSensorDPI (function 0x01) — sensor 0
-    const dpiResp = this.sendRequest(devicePath, proto.deviceIndex, feature.featureIndex, 0x01, [0x00]);
+    const dpiResp = this.sendRequest(devicePath, proto.deviceIndex, feature.featureIndex, 0x01, [0x00], 300);
     if (!dpiResp) return null;
 
     const dpiParsed = parseHidppMessage(dpiResp);
     if (!dpiParsed) return null;
 
-    const currentDpi = (dpiParsed.params[1] << 8) | dpiParsed.params[2];
-    const defaultDpi = (dpiParsed.params[3] << 8) | dpiParsed.params[4];
+    const be16 = (hi: number, lo: number) => (hi << 8) | lo;
+    const le16 = (lo: number, hi: number) => (hi << 8) | lo;
+    const isReasonableDpi = (v: number) => Number.isFinite(v) && v >= 100 && v <= 25600 && v % 50 === 0;
+
+    const currentBE = be16(dpiParsed.params[1], dpiParsed.params[2]);
+    const currentLE = le16(dpiParsed.params[1], dpiParsed.params[2]);
+    const defaultBE = be16(dpiParsed.params[3], dpiParsed.params[4]);
+    const defaultLE = le16(dpiParsed.params[3], dpiParsed.params[4]);
+
+    const currentDpi = isReasonableDpi(currentLE) && !isReasonableDpi(currentBE) ? currentLE : currentBE;
+    const defaultDpi = isReasonableDpi(defaultLE) && !isReasonableDpi(defaultBE) ? defaultLE : defaultBE;
 
     // GetSensorDPIList (function 0x02) — sensor 0
-    const listResp = this.sendRequest(devicePath, proto.deviceIndex, feature.featureIndex, 0x02, [0x00]);
+    const listResp = this.sendRequest(devicePath, proto.deviceIndex, feature.featureIndex, 0x02, [0x00], 500);
     if (!listResp) return null;
 
     const listParsed = parseHidppMessage(listResp);
     if (!listParsed) return null;
 
-    const parseDpiList = (startIndex: number) => {
+    const parseDpiList = (startIndex: number, endian: 'be' | 'le') => {
       const values: number[] = [];
       let minValue = 0xffff;
       let maxValue = 0;
@@ -359,7 +369,9 @@ export class HidppService extends EventEmitter {
       // DPI list: pairs of bytes (big-endian). Some firmwares include a leading sensor index byte;
       // others appear to start immediately with values. Try both and pick the best result.
       for (let i = startIndex; i < listParsed.params.length - 1; i += 2) {
-        const value = (listParsed.params[i] << 8) | listParsed.params[i + 1];
+        const value = endian === 'le'
+          ? (listParsed.params[i + 1] << 8) | listParsed.params[i]
+          : (listParsed.params[i] << 8) | listParsed.params[i + 1];
         if (value === 0) break;
 
         // 0xe001+ means hyphen/range step encoding.
@@ -395,9 +407,13 @@ export class HidppService extends EventEmitter {
       };
     };
 
-    const parsedFrom1 = parseDpiList(1);
-    const parsedFrom0 = parseDpiList(0);
-    const best = parsedFrom1.values.length >= parsedFrom0.values.length ? parsedFrom1 : parsedFrom0;
+    const candidates = [
+      parseDpiList(1, 'be'),
+      parseDpiList(0, 'be'),
+      parseDpiList(1, 'le'),
+      parseDpiList(0, 'le'),
+    ];
+    const best = candidates.sort((a, b) => b.values.length - a.values.length)[0];
 
     const withCurrent = [best.values, [currentDpi, defaultDpi]]
       .flat()
