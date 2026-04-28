@@ -51,7 +51,15 @@ export function DpiEditor({ device, onDpiChange, onDpiConfigChange }: Props) {
     setEditingIndex(null);
   };
 
-  const handleDragStart = (value: number, source: DragSource) => {
+  const handleDragStart = (e: React.DragEvent<HTMLElement>, value: number, source: DragSource) => {
+    // Wayland/Ozone can error if a drag starts without a payload.
+    // Provide a small text payload so the compositor has valid drag data.
+    try {
+      e.dataTransfer.setData('text/plain', String(value));
+      e.dataTransfer.effectAllowed = 'copyMove';
+    } catch {
+      // ignore
+    }
     setDraggedValue(value);
     setDragSource(source);
   };
@@ -118,7 +126,7 @@ export function DpiEditor({ device, onDpiChange, onDpiConfigChange }: Props) {
             <div
               className={`dpi-editor__level ${level.isActive ? 'dpi-editor__level--active' : ''}`}
               draggable
-              onDragStart={() => handleDragStart(level.dpi, 'cycle')}
+              onDragStart={(e) => handleDragStart(e, level.dpi, 'cycle')}
               onDragEnd={clearDrag}
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => handleDropOnCycle(index)}
@@ -183,7 +191,7 @@ export function DpiEditor({ device, onDpiChange, onDpiConfigChange }: Props) {
               key={value}
               className="dpi-editor__preset"
               draggable
-              onDragStart={() => handleDragStart(value, 'supported')}
+              onDragStart={(e) => handleDragStart(e, value, 'supported')}
               onDragEnd={clearDrag}
               onClick={() => insertValue(dpiConfig.levels.length, value)}
               style={{ borderColor: `rgb(${color.r}, ${color.g}, ${color.b})` }}
