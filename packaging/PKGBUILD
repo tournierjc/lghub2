@@ -1,7 +1,7 @@
 # Maintainer: tournierjc <https://github.com/tournierjc>
 pkgname=lghub2
 pkgver=0.1.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Cross-platform reimplementation of Logitech G Hub"
 arch=('x86_64')
 url="https://github.com/tournierjc/lghub2"
@@ -12,6 +12,15 @@ options=(!debug !strip)
 install="$pkgname.install"
 source=("$pkgname::git+https://github.com/tournierjc/lghub2.git")
 sha256sums=('SKIP')
+
+pkgver() {
+  cd "$srcdir/$pkgname"
+  # 0.1.0.r123.gabcdef0
+  printf '%s.r%s.g%s' \
+    "${pkgver}" \
+    "$(git rev-list --count HEAD)" \
+    "$(git rev-parse --short=7 HEAD)"
+}
 
 build() {
   cd "$srcdir/$pkgname"
