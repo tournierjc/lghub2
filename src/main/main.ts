@@ -14,6 +14,7 @@ let deviceService: DeviceService | null = null;
 let profileStore: ProfileStore | null = null;
 let marketplaceService: MarketplaceService | null = null;
 let appSwitcher: AppSwitcher | null = null;
+let isQuitting = false;
 
 const isDev = process.env.NODE_ENV !== 'production';
 const DEV_SERVER_URL = 'http://localhost:3000';
@@ -52,8 +53,12 @@ function createWindow(): void {
   });
 
   mainWindow.on('close', (event) => {
-    event.preventDefault();
-    mainWindow?.hide();
+    // Default behavior is "minimize-to-tray", but allow real quit on app.quit()
+    // and on explicit close requests.
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow?.hide();
+    }
   });
 
   mainWindow.on('closed', () => {
@@ -102,6 +107,21 @@ app.whenReady().then(async () => {
   });
 });
 
+function requestQuit(): void {
+  if (isQuitting) return;
+  isQuitting = true;
+  try {
+    app.quit();
+  } catch {
+    // last resort
+    process.exit(0);
+  }
+}
+
+// Graceful shutdown for terminal Ctrl+C and service managers.
+process.on('SIGINT', requestQuit);
+process.on('SIGTERM', requestQuit);
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
@@ -109,6 +129,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  isQuitting = true;
   appSwitcher?.stop();
   deviceService?.dispose();
   hidManager?.dispose();

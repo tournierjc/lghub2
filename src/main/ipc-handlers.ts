@@ -32,7 +32,8 @@ export function registerIpcHandlers(window: BrowserWindow, hidManager: HidManage
       window.maximize();
     }
   });
-  ipcMain.on(IpcChannel.CLOSE_WINDOW, () => window.hide());
+  // Renderer "close" should quit the app (tray provides hide/minimize behavior).
+  ipcMain.on(IpcChannel.CLOSE_WINDOW, () => app.quit());
   ipcMain.on(IpcChannel.SET_WINDOW_TITLE, (_event, title: string) => window.setTitle(title));
   ipcMain.on(IpcChannel.RELAUNCH, () => {
     app.relaunch();
