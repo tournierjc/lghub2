@@ -1,8 +1,9 @@
 # Maintainer: tournierjc <https://github.com/tournierjc>
 pkgname=lghub2
-# Baseline for makepkg; pkgver() below always derives the real version from package.json + git.
+# Baseline for makepkg; pkgver() sets the real version from package.json + git.
+# makepkg may rewrite this line — restore with: git checkout packaging/PKGBUILD
 pkgver=0.1.0
-pkgrel=3
+pkgrel=4
 pkgdesc="Cross-platform reimplementation of Logitech G Hub"
 arch=('x86_64')
 url="https://github.com/tournierjc/lghub2"
@@ -11,7 +12,15 @@ depends=('electron' 'libusb')
 makedepends=('nodejs>=22' 'npm' 'python' 'gcc')
 options=(!debug !strip)
 install="$pkgname.install"
-source=("$pkgname::git+https://github.com/tournierjc/lghub2.git")
+
+# Prefer the parent checkout when this file lives in <repo>/packaging/, so `makepkg`
+# does not build stale GitHub main (push first for reproducible remote builds).
+_repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ -d "${_repo_root}/.git" ]]; then
+  source=("${pkgname}::git+file://${_repo_root}")
+else
+  source=("${pkgname}::git+https://github.com/tournierjc/lghub2.git")
+fi
 sha256sums=('SKIP')
 
 pkgver() {
