@@ -6,3 +6,9 @@ release/
 *.tgz
 .env
 .DS_Store
+
+# makepkg (packaging/PKGBUILD)
+packaging/pkg/
+packaging/src/
+packaging/lghub2/
+packaging/*.pkg.tar.zst
