@@ -1,5 +1,6 @@
 import { DeviceType } from '../../../shared/device-types';
 import type { ButtonDef } from '../../../shared/device-buttons';
+import { getDeviceImageAsset } from '../../assets/device-images';
 
 interface Props {
   modelId: string;
@@ -64,11 +65,13 @@ export function DeviceImage({ modelId, deviceType, className, buttons, selectedB
   const model = modelId.toLowerCase();
   const overlayButtons = buttons?.filter((button) => button.layoutPos) ?? [];
   const selectedId = selectedButtonId?.toLowerCase() ?? null;
+  const imageAsset = getDeviceImageAsset(model);
+  const imageNode = imageAsset ? <img className="device-image__img" alt="" src={imageAsset} /> : null;
 
   if (model === 'c332' || model === 'c547' || model === 'c090' || model === 'c091' || model === 'c08b') {
     return (
       <div className={`device-image ${className || ''}`.trim()}>
-        <G502Svg className="device-image__svg" />
+        {imageNode || <G502Svg className="device-image__svg" />}
         {!!overlayButtons.length && (
           <div className="device-image__overlay">
             {overlayButtons.map((button) => {
@@ -101,7 +104,7 @@ export function DeviceImage({ modelId, deviceType, className, buttons, selectedB
   if (model === 'c33c' || model === 'c33f' || model === 'c343' || model === 'c339') {
     return (
       <div className={`device-image ${className || ''}`.trim()}>
-        <G513Svg className="device-image__svg" />
+        {imageNode || <G513Svg className="device-image__svg" />}
         {!!overlayButtons.length && (
           <div className="device-image__overlay">
             {overlayButtons.map((button) => {
@@ -132,5 +135,5 @@ export function DeviceImage({ modelId, deviceType, className, buttons, selectedB
     );
   }
   const fallbackSvg = deviceType === DeviceType.KEYBOARD ? <G513Svg className="device-image__svg" /> : <GenericMouseSvg className="device-image__svg" />;
-  return <div className={`device-image ${className || ''}`.trim()}>{fallbackSvg}</div>;
+  return <div className={`device-image ${className || ''}`.trim()}>{imageNode || fallbackSvg}</div>;
 }
