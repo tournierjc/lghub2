@@ -67,6 +67,8 @@ export function DevicePage() {
   const [appSearching, setAppSearching] = useState(false);
   const [customBinaryName, setCustomBinaryName] = useState('');
   const [appImportStatus, setAppImportStatus] = useState<string>('');
+  const [customDeviceImageUrl, setCustomDeviceImageUrl] = useState<string | null>(null);
+  const [deviceImageFeedback, setDeviceImageFeedback] = useState('');
 
   const tabs = device ? getAvailableTabs(device) : [];
   const activeProfile = profiles.find((p) => p.id === device?.activeProfile?.id) || device?.activeProfile;
@@ -90,6 +92,16 @@ export function DevicePage() {
       dispatch(loadProfiles(device.modelId));
     }
   }, [device, dispatch]);
+
+  const refreshCustomDeviceImage = useCallback(async () => {
+    if (!device) return;
+    const url = await window.device.getCustomDeviceImageUrl(device.modelId);
+    setCustomDeviceImageUrl(url);
+  }, [device]);
+
+  useEffect(() => {
+    refreshCustomDeviceImage();
+  }, [refreshCustomDeviceImage]);
 
   useEffect(() => {
     if (!profileMenuOpen) return;
@@ -244,6 +256,37 @@ export function DevicePage() {
     setAppImportStatus(`Imported ${importResult.importedCount ?? 0} applications`);
   }, []);
 
+  const notifyDeviceImagesChanged = useCallback(() => {
+    if (!device) return;
+    window.dispatchEvent(new CustomEvent('lghub2:device-image-updated', { detail: { modelId: device.modelId } }));
+  }, [device]);
+
+  const handlePickCustomDeviceImage = useCallback(async () => {
+    if (!device) return;
+    setDeviceImageFeedback('');
+    const result = await window.electron.openDialog({
+      title: 'Choose hardware image',
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'] }],
+    });
+    if (result.canceled || result.filePaths.length === 0) return;
+    const importResult = await window.device.importCustomDeviceImage(device.modelId, result.filePaths[0]);
+    if (!importResult.ok) {
+      setDeviceImageFeedback(importResult.error || 'Could not save image');
+      return;
+    }
+    await refreshCustomDeviceImage();
+    notifyDeviceImagesChanged();
+  }, [device, notifyDeviceImagesChanged, refreshCustomDeviceImage]);
+
+  const handleClearCustomDeviceImage = useCallback(async () => {
+    if (!device) return;
+    setDeviceImageFeedback('');
+    await window.device.clearCustomDeviceImage(device.modelId);
+    setCustomDeviceImageUrl(null);
+    notifyDeviceImagesChanged();
+  }, [device, notifyDeviceImagesChanged]);
+
   const handleAssignApp = useCallback((app: AppEntry) => {
     if (!device || !activeProfile) return;
 
@@ -300,7 +343,28 @@ export function DevicePage() {
   return (
     <div className="device-page">
       <header className="device-page__header">
-        <DeviceImage modelId={device.modelId} deviceType={device.type} className="device-page__image" />
+        <div className="device-page__header-image-col">
+          <div className="device-page__image-wrap">
+            <DeviceImage
+              modelId={device.modelId}
+              deviceType={device.type}
+              customImageSrc={customDeviceImageUrl}
+              imageAlt={device.name}
+              className="device-page__image"
+            />
+          </div>
+          <div className="device-page__image-actions">
+            <button type="button" className="device-page__image-action" onClick={handlePickCustomDeviceImage}>
+              Custom image…
+            </button>
+            {customDeviceImageUrl ? (
+              <button type="button" className="device-page__image-action" onClick={handleClearCustomDeviceImage}>
+                Reset to default
+              </button>
+            ) : null}
+          </div>
+          {deviceImageFeedback ? <div className="device-page__image-feedback">{deviceImageFeedback}</div> : null}
+        </div>
         <div className="device-page__header-info">
           <h1>{device.name}</h1>
           <div className="device-page__header-meta">
@@ -430,6 +494,7 @@ export function DevicePage() {
             onApply={handleButtonApply}
             selectedButtonId={selectedButtonId}
             onSelectButton={setSelectedButtonId}
+            customDeviceImageSrc={customDeviceImageUrl}
           />
         )}
         {activeTab === 'equalizer' && (

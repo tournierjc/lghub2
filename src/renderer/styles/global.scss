@@ -397,13 +397,70 @@ button {
 
   &__header {
     display: flex;
-    align-items: baseline;
-    gap: 12px;
+    align-items: flex-start;
+    gap: 16px;
     margin-bottom: 24px;
 
     h1 {
       font-size: var(--font-size-xl);
     }
+  }
+
+  &__header-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__header-image-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  &__image-wrap {
+    width: min(280px, 36vw);
+    height: 168px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-card);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+
+    .device-image {
+      width: 100%;
+      height: 100%;
+    }
+  }
+
+  &__image-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-width: min(280px, 36vw);
+  }
+
+  &__image-action {
+    font-size: var(--font-size-xs);
+    padding: 6px 12px;
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+  }
+
+  &__image-feedback {
+    font-size: var(--font-size-xs);
+    color: var(--accent-danger);
+    max-width: min(280px, 36vw);
   }
 
   &__connection {

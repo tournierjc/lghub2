@@ -9,6 +9,7 @@ interface Props {
   onApply: (assignments: Record<string, ButtonAssignment>) => void;
   selectedButtonId?: string | null;
   onSelectButton?: (buttonId: string | null) => void;
+  customDeviceImageSrc?: string | null;
 }
 
 type ActionTab = 'mouse' | 'keyboard' | 'macro' | 'dpi' | 'media' | 'disabled';
@@ -99,7 +100,7 @@ function buildAssignmentsFromDefs(defs: ButtonDef[], existing: Record<string, Bu
   return result;
 }
 
-export function ButtonEditor({ device, activeProfile, onApply, selectedButtonId, onSelectButton }: Props) {
+export function ButtonEditor({ device, activeProfile, onApply, selectedButtonId, onSelectButton, customDeviceImageSrc }: Props) {
   const defs = getButtonDefsForDevice(device.modelId, device.type);
   const [assignments, setAssignments] = useState<Record<string, ButtonAssignment>>(() =>
     buildAssignmentsFromDefs(defs, activeProfile.assignments)
@@ -260,6 +261,8 @@ export function ButtonEditor({ device, activeProfile, onApply, selectedButtonId,
           <DeviceImage
             modelId={device.modelId}
             deviceType={device.type}
+            customImageSrc={customDeviceImageSrc}
+            imageAlt={device.name}
             className="button-editor__diagram-image"
             buttons={defs}
             selectedButtonId={selectedButtonId || selected?.controlId.toString(16).padStart(4, '0') || null}

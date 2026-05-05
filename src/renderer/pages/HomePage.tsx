@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../hooks/use-store';
 import { scanDevices, setDiscoveredDevices, selectDevice } from '../store/slices/devices-slice';
 import { navigateTo } from '../store/slices/app-slice';
@@ -8,6 +8,15 @@ export function HomePage() {
   const dispatch = useAppDispatch();
   const connected = useAppSelector((state) => state.devices.connected);
   const loading = useAppSelector((state) => state.devices.loading);
+  const [customImageByModel, setCustomImageByModel] = useState<Record<string, string | null>>({});
+
+  const refreshCustomDeviceImages = useCallback(async () => {
+    const modelIds = [...new Set(connected.map((d) => d.modelId))];
+    const pairs = await Promise.all(
+      modelIds.map(async (modelId) => [modelId, await window.device.getCustomDeviceImageUrl(modelId)] as const),
+    );
+    setCustomImageByModel(Object.fromEntries(pairs));
+  }, [connected]);
 
   useEffect(() => {
     const init = async () => {
@@ -17,6 +26,15 @@ export function HomePage() {
     };
     init();
   }, [dispatch]);
+
+  useEffect(() => {
+    refreshCustomDeviceImages();
+  }, [refreshCustomDeviceImages]);
+
+  useEffect(() => {
+    window.addEventListener('lghub2:device-image-updated', refreshCustomDeviceImages);
+    return () => window.removeEventListener('lghub2:device-image-updated', refreshCustomDeviceImages);
+  }, [refreshCustomDeviceImages]);
 
   return (
     <div className="home-page">
@@ -44,7 +62,12 @@ export function HomePage() {
             }}
           >
             <div className="device-card__image">
-              <DeviceImage modelId={device.modelId} deviceType={device.type} />
+              <DeviceImage
+                modelId={device.modelId}
+                deviceType={device.type}
+                customImageSrc={customImageByModel[device.modelId] ?? undefined}
+                imageAlt={device.name}
+              />
             </div>
             <div className="device-card__info">
               <h3 className="device-card__name">{device.name}</h3>

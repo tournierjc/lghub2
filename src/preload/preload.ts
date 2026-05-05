@@ -57,6 +57,12 @@ const deviceApi = {
   getButtons: (hidPath: string) => ipcRenderer.invoke(IpcChannel.DEVICE_GET_BUTTONS, hidPath),
   remapButton: (hidPath: string, controlId: number, newTaskId: number) =>
     ipcRenderer.invoke(IpcChannel.DEVICE_REMAP_BUTTON, hidPath, controlId, newTaskId),
+  getCustomDeviceImageUrl: (modelId: string) =>
+    ipcRenderer.invoke(IpcChannel.DEVICE_IMAGE_GET_CUSTOM_URL, modelId) as Promise<string | null>,
+  importCustomDeviceImage: (modelId: string, sourcePath: string) =>
+    ipcRenderer.invoke(IpcChannel.DEVICE_IMAGE_IMPORT, modelId, sourcePath) as Promise<{ ok: boolean; error?: string }>,
+  clearCustomDeviceImage: (modelId: string) =>
+    ipcRenderer.invoke(IpcChannel.DEVICE_IMAGE_CLEAR, modelId) as Promise<boolean>,
 };
 
 const profileApi = {

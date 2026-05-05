@@ -6,9 +6,17 @@ interface Props {
   modelId: string;
   deviceType: DeviceType;
   className?: string;
+  /** User-imported hardware photo (via main process); overrides bundled SVG / asset map. */
+  customImageSrc?: string | null;
+  imageAlt?: string;
   buttons?: ButtonDef[];
   selectedButtonId?: string | null;
   onButtonSelect?: (buttonId: string) => void;
+}
+
+function hardwareImageSrc(modelIdLower: string, customImageSrc: string | null | undefined): string | null {
+  if (customImageSrc) return customImageSrc;
+  return getDeviceImageAsset(modelIdLower);
 }
 
 function G502Svg({ className }: { className?: string }) {
@@ -61,12 +69,14 @@ function GenericMouseSvg({ className }: { className?: string }) {
   );
 }
 
-export function DeviceImage({ modelId, deviceType, className, buttons, selectedButtonId, onButtonSelect }: Props) {
+export function DeviceImage({ modelId, deviceType, className, customImageSrc, imageAlt, buttons, selectedButtonId, onButtonSelect }: Props) {
   const model = modelId.toLowerCase();
   const overlayButtons = buttons?.filter((button) => button.layoutPos) ?? [];
   const selectedId = selectedButtonId?.toLowerCase() ?? null;
-  const imageAsset = getDeviceImageAsset(model);
-  const imageNode = imageAsset ? <img className="device-image__img" alt="" src={imageAsset} /> : null;
+  const resolvedHardwareSrc = hardwareImageSrc(model, customImageSrc);
+  const imageNode = resolvedHardwareSrc ? (
+    <img className="device-image__img" alt={imageAlt ?? ''} src={resolvedHardwareSrc} draggable={false} />
+  ) : null;
 
   if (model === 'c332' || model === 'c547' || model === 'c090' || model === 'c091' || model === 'c08b') {
     return (

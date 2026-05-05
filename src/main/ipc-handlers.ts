@@ -7,6 +7,7 @@ import { HidManager } from './hid/hid-manager';
 import { DeviceService } from './hid/device-service';
 import { ProfileStore } from './profile-store';
 import { MarketplaceService } from './marketplace-service';
+import { DeviceImageStore } from './device-image-store';
 import { DeviceProfile } from '../shared/device-types';
 import { extractDetectionExecutables } from './app-detection';
 import { mergeProfileStateWithScanned } from '../shared/profile-utils';
@@ -43,7 +44,13 @@ function loadCatalogData(): CatalogApplicationData {
   return require('../data/applications.json') as CatalogApplicationData;
 }
 
+let deviceImageStore: DeviceImageStore | null = null;
+
 export function registerIpcHandlers(window: BrowserWindow, hidManager: HidManager, deviceService: DeviceService, profileStore: ProfileStore, marketplaceService: MarketplaceService): void {
+  if (!deviceImageStore) {
+    deviceImageStore = new DeviceImageStore();
+  }
+
   // Window management
   ipcMain.on(IpcChannel.MINIMIZE, () => window.minimize());
   ipcMain.on(IpcChannel.MAXIMIZE, () => {
@@ -135,6 +142,18 @@ export function registerIpcHandlers(window: BrowserWindow, hidManager: HidManage
   ipcMain.handle(IpcChannel.DEVICE_GET_BUTTONS, (_event, hidPath: string) => {
     const device = deviceService.getDevice(hidPath);
     return device?.activeProfile.assignments || {};
+  });
+
+  ipcMain.handle(IpcChannel.DEVICE_IMAGE_GET_CUSTOM_URL, (_event, modelId: string) => {
+    return deviceImageStore!.getCustomImageFileUrl(modelId);
+  });
+
+  ipcMain.handle(IpcChannel.DEVICE_IMAGE_IMPORT, (_event, modelId: string, sourcePath: string) => {
+    return deviceImageStore!.importFromFile(modelId, sourcePath);
+  });
+
+  ipcMain.handle(IpcChannel.DEVICE_IMAGE_CLEAR, (_event, modelId: string) => {
+    return deviceImageStore!.clear(modelId);
   });
 
   ipcMain.handle(IpcChannel.APP_DATA_SEARCH, (_event, query: string) => {
