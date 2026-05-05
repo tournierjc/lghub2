@@ -88,6 +88,7 @@ export function DeviceImage({ modelId, deviceType, className, buttons, selectedB
                   disabled={!onButtonSelect}
                 >
                   <span className="device-image__button-dot" />
+                  <span className="device-image__button-line" aria-hidden="true" />
                   <span className="device-image__button-label">{button.name}</span>
                 </button>
               );
@@ -120,6 +121,7 @@ export function DeviceImage({ modelId, deviceType, className, buttons, selectedB
                   disabled={!onButtonSelect}
                 >
                   <span className="device-image__button-dot" />
+                  <span className="device-image__button-line" aria-hidden="true" />
                   <span className="device-image__button-label">{button.name}</span>
                 </button>
               );

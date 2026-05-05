@@ -668,6 +668,14 @@ button {
     box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.18);
   }
 
+  &__button-line {
+    width: 18px;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.22);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+    flex: 0 0 auto;
+  }
+
   &__button-label {
     display: none;
     padding: 3px 6px;
