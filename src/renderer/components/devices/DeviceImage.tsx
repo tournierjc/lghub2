@@ -69,7 +69,72 @@ function GenericMouseSvg({ className }: { className?: string }) {
   );
 }
 
-export function DeviceImage({ modelId, deviceType, className, customImageSrc, imageAlt, buttons, selectedButtonId, onButtonSelect }: Props) {
+type BundledIllustration = 'g502' | 'g513' | 'generic-mouse' | 'generic-kb';
+
+function bundledIllustrationFor(model: string, deviceType: DeviceType): BundledIllustration {
+  if (['c332', 'c547', 'c090', 'c091', 'c08b'].includes(model)) return 'g502';
+  if (['c33c', 'c33f', 'c343', 'c339'].includes(model)) return 'g513';
+  return deviceType === DeviceType.KEYBOARD ? 'generic-kb' : 'generic-mouse';
+}
+
+function renderBundledSvg(kind: BundledIllustration, className: string) {
+  switch (kind) {
+    case 'g502':
+      return <G502Svg className={className} />;
+    case 'g513':
+    case 'generic-kb':
+      return <G513Svg className={className} />;
+    default:
+      return <GenericMouseSvg className={className} />;
+  }
+}
+
+interface MappingOverlayProps {
+  buttons: ButtonDef[];
+  selectedId: string | null;
+  defaultAlign: 'left' | 'right' | 'top' | 'bottom' | 'center';
+  onButtonSelect?: (buttonId: string) => void;
+}
+
+function MappingOverlay({ buttons, selectedId, defaultAlign, onButtonSelect }: MappingOverlayProps) {
+  return (
+    <>
+      {buttons.map((button) => {
+        const buttonId = button.controlId.toString(16).padStart(4, '0');
+        const [x, y] = button.layoutPos as [number, number];
+        const isSelected = selectedId === buttonId;
+        const alignClass = button.layoutAlign ? `device-image__button--${button.layoutAlign}` : `device-image__button--${defaultAlign}`;
+        return (
+          <button
+            key={buttonId}
+            type="button"
+            className={`device-image__button ${alignClass} ${isSelected ? 'device-image__button--selected' : ''}`.trim()}
+            style={{ left: `${x}%`, top: `${y}%` }}
+            title={button.name}
+            aria-pressed={isSelected}
+            onClick={() => onButtonSelect?.(buttonId)}
+            disabled={!onButtonSelect}
+          >
+            <span className="device-image__button-dot" />
+            <span className="device-image__button-line" aria-hidden="true" />
+            <span className="device-image__button-label">{button.name}</span>
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
+export function DeviceImage({
+  modelId,
+  deviceType,
+  className,
+  customImageSrc,
+  imageAlt,
+  buttons,
+  selectedButtonId,
+  onButtonSelect,
+}: Props) {
   const model = modelId.toLowerCase();
   const overlayButtons = buttons?.filter((button) => button.layoutPos) ?? [];
   const selectedId = selectedButtonId?.toLowerCase() ?? null;
@@ -78,72 +143,26 @@ export function DeviceImage({ modelId, deviceType, className, customImageSrc, im
     <img className="device-image__img" alt={imageAlt ?? ''} src={resolvedHardwareSrc} draggable={false} />
   ) : null;
 
-  if (model === 'c332' || model === 'c547' || model === 'c090' || model === 'c091' || model === 'c08b') {
-    return (
-      <div className={`device-image ${className || ''}`.trim()}>
-        {imageNode || <G502Svg className="device-image__svg" />}
-        {!!overlayButtons.length && (
-          <div className="device-image__overlay">
-            {overlayButtons.map((button) => {
-              const buttonId = button.controlId.toString(16).padStart(4, '0');
-              const [x, y] = button.layoutPos as [number, number];
-              const isSelected = selectedId === buttonId;
-              const alignClass = button.layoutAlign ? `device-image__button--${button.layoutAlign}` : 'device-image__button--right';
-              return (
-                <button
-                  key={buttonId}
-                  type="button"
-                  className={`device-image__button ${alignClass} ${isSelected ? 'device-image__button--selected' : ''}`}
-                  style={{ left: `${x}%`, top: `${y}%` }}
-                  title={button.name}
-                  aria-pressed={isSelected}
-                  onClick={() => onButtonSelect?.(buttonId)}
-                  disabled={!onButtonSelect}
-                >
-                  <span className="device-image__button-dot" />
-                  <span className="device-image__button-line" aria-hidden="true" />
-                  <span className="device-image__button-label">{button.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
+  const bundledKind = bundledIllustrationFor(model, deviceType);
+  const defaultAlign: MappingOverlayProps['defaultAlign'] = bundledKind === 'g502' || bundledKind === 'generic-mouse' ? 'right' : 'top';
+  const illustration = imageNode || renderBundledSvg(bundledKind, 'device-image__svg');
+  const hasMapping = overlayButtons.length > 0;
+
+  return (
+    <div className={`device-image ${hasMapping ? 'device-image--with-mapping' : ''} ${className || ''}`.trim()}>
+      <div className="device-image__surface">
+        {illustration}
       </div>
-    );
-  }
-  if (model === 'c33c' || model === 'c33f' || model === 'c343' || model === 'c339') {
-    return (
-      <div className={`device-image ${className || ''}`.trim()}>
-        {imageNode || <G513Svg className="device-image__svg" />}
-        {!!overlayButtons.length && (
-          <div className="device-image__overlay">
-            {overlayButtons.map((button) => {
-              const buttonId = button.controlId.toString(16).padStart(4, '0');
-              const [x, y] = button.layoutPos as [number, number];
-              const isSelected = selectedId === buttonId;
-              const alignClass = button.layoutAlign ? `device-image__button--${button.layoutAlign}` : 'device-image__button--top';
-              return (
-                <button
-                  key={buttonId}
-                  type="button"
-                  className={`device-image__button ${alignClass} ${isSelected ? 'device-image__button--selected' : ''}`}
-                  style={{ left: `${x}%`, top: `${y}%` }}
-                  title={button.name}
-                  aria-pressed={isSelected}
-                  onClick={() => onButtonSelect?.(buttonId)}
-                  disabled={!onButtonSelect}
-                >
-                  <span className="device-image__button-dot" />
-                  <span className="device-image__button-line" aria-hidden="true" />
-                  <span className="device-image__button-label">{button.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  }
-  const fallbackSvg = deviceType === DeviceType.KEYBOARD ? <G513Svg className="device-image__svg" /> : <GenericMouseSvg className="device-image__svg" />;
-  return <div className={`device-image ${className || ''}`.trim()}>{imageNode || fallbackSvg}</div>;
+      {hasMapping && (
+        <div className="device-image__overlay">
+          <MappingOverlay
+            buttons={overlayButtons}
+            selectedId={selectedId}
+            defaultAlign={defaultAlign}
+            onButtonSelect={onButtonSelect}
+          />
+        </div>
+      )}
+    </div>
+  );
 }
