@@ -1,7 +1,8 @@
 # Maintainer: tournierjc <https://github.com/tournierjc>
 pkgname=lghub2
+# Baseline for makepkg; pkgver() below always derives the real version from package.json + git.
 pkgver=0.1.0
-pkgrel=2
+pkgrel=3
 pkgdesc="Cross-platform reimplementation of Logitech G Hub"
 arch=('x86_64')
 url="https://github.com/tournierjc/lghub2"
@@ -15,9 +16,12 @@ sha256sums=('SKIP')
 
 pkgver() {
   cd "$srcdir/$pkgname"
-  # 0.1.0.r123.gabcdef0
+  # Do not use $pkgver here: makepkg may rewrite pkgver= and nesting breaks the next build.
+  # Avoid node here: pkgver() can run before makedepends (nodejs) are installed.
+  local _appver
+  _appver=$(grep -m1 '"version"' package.json | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
   printf '%s.r%s.g%s' \
-    "${pkgver}" \
+    "$_appver" \
     "$(git rev-list --count HEAD)" \
     "$(git rev-parse --short=7 HEAD)"
 }
