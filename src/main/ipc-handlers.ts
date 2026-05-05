@@ -22,6 +22,27 @@ interface CatalogApplicationData {
   applications: CatalogApplication[];
 }
 
+const APP_DATA_OVERRIDE_FILENAME = 'applications.json';
+
+function resolveAppDataOverridePath(): string {
+  return path.join(app.getPath('userData'), APP_DATA_OVERRIDE_FILENAME);
+}
+
+function loadCatalogData(): CatalogApplicationData {
+  const overridePath = resolveAppDataOverridePath();
+  try {
+    if (fs.existsSync(overridePath)) {
+      const raw = fs.readFileSync(overridePath, 'utf-8');
+      const parsed = JSON.parse(raw) as CatalogApplicationData;
+      if (parsed && Array.isArray(parsed.applications)) return parsed;
+    }
+  } catch {
+  }
+
+  // Fallback to bundled catalog.
+  return require('../data/applications.json') as CatalogApplicationData;
+}
+
 export function registerIpcHandlers(window: BrowserWindow, hidManager: HidManager, deviceService: DeviceService, profileStore: ProfileStore, marketplaceService: MarketplaceService): void {
   // Window management
   ipcMain.on(IpcChannel.MINIMIZE, () => window.minimize());
@@ -117,7 +138,7 @@ export function registerIpcHandlers(window: BrowserWindow, hidManager: HidManage
   });
 
   ipcMain.handle(IpcChannel.APP_DATA_SEARCH, (_event, query: string) => {
-    const data = require('../data/applications.json') as CatalogApplicationData;
+    const data = loadCatalogData();
     const q = query.toLowerCase();
     return data.applications
       .filter((a) => a.name?.toLowerCase().includes(q))
@@ -132,9 +153,30 @@ export function registerIpcHandlers(window: BrowserWindow, hidManager: HidManage
   });
 
   ipcMain.handle(IpcChannel.APP_DATA_GET, (_event, appId: string) => {
-    const data = require('../data/applications.json') as CatalogApplicationData;
+    const data = loadCatalogData();
     const application = data.applications.find((a) => a.applicationId === appId);
     return application ? { ...application, detectionExecutables: extractDetectionExecutables(application.detection) } : null;
+  });
+
+  ipcMain.handle(IpcChannel.APP_DATA_IMPORT, async (_event, folderPath: string) => {
+    try {
+      const sourcePath = path.join(folderPath, 'applications.json');
+      if (!fs.existsSync(sourcePath)) {
+        return { ok: false, error: `No applications.json found in ${folderPath}` };
+      }
+
+      const raw = fs.readFileSync(sourcePath, 'utf-8');
+      const parsed = JSON.parse(raw) as CatalogApplicationData;
+      if (!parsed || !Array.isArray(parsed.applications)) {
+        return { ok: false, error: 'Invalid applications.json format' };
+      }
+
+      const destPath = resolveAppDataOverridePath();
+      fs.writeFileSync(destPath, JSON.stringify(parsed), 'utf-8');
+      return { ok: true, importedCount: parsed.applications.length };
+    } catch (err) {
+      return { ok: false, error: (err as Error)?.message || String(err) };
+    }
   });
 
   // Profile management

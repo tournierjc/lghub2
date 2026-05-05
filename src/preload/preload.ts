@@ -89,6 +89,7 @@ const storeApi = {
 const appDataApi = {
   search: (query: string) => ipcRenderer.invoke(IpcChannel.APP_DATA_SEARCH, query) as Promise<AppDataEntry[]>,
   get: (appId: string) => ipcRenderer.invoke(IpcChannel.APP_DATA_GET, appId) as Promise<(AppDataEntry & Record<string, unknown>) | null>,
+  importFromFolder: (folderPath: string) => ipcRenderer.invoke(IpcChannel.APP_DATA_IMPORT, folderPath) as Promise<{ ok: boolean; importedCount?: number; error?: string }>,
 };
 
 contextBridge.exposeInMainWorld('electron', electronApi);

@@ -112,6 +112,7 @@ export enum IpcChannel {
   // Application data
   APP_DATA_SEARCH = 'appdata:search',
   APP_DATA_GET = 'appdata:get',
+  APP_DATA_IMPORT = 'appdata:import',
 
   // App-profile auto-switching (main → renderer)
   APP_PROFILE_SWITCHED = 'app:profile-switched',

@@ -68,6 +68,7 @@ export function DevicePage() {
   const [appResults, setAppResults] = useState<AppEntry[]>([]);
   const [appSearching, setAppSearching] = useState(false);
   const [customBinaryName, setCustomBinaryName] = useState('');
+  const [appImportStatus, setAppImportStatus] = useState<string>('');
 
   const tabs = device ? getAvailableTabs(device) : [];
   const activeProfile = profiles.find((p) => p.id === device?.activeProfile?.id) || device?.activeProfile;
@@ -225,6 +226,24 @@ export function DevicePage() {
     const results = await window.appData.search(query);
     setAppResults(results);
     setAppSearching(false);
+  }, []);
+
+  const handleImportAppCatalog = useCallback(async () => {
+    setAppImportStatus('');
+    const result = await window.electron.openDialog({
+      title: 'Select G HUB data folder (contains applications.json)',
+      properties: ['openDirectory'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return;
+
+    setAppImportStatus('Importing…');
+    const folderPath = result.filePaths[0];
+    const importResult = await window.appData.importFromFolder(folderPath);
+    if (!importResult.ok) {
+      setAppImportStatus(importResult.error || 'Import failed');
+      return;
+    }
+    setAppImportStatus(`Imported ${importResult.importedCount ?? 0} applications`);
   }, []);
 
   const handleAssignApp = useCallback((app: AppEntry) => {
@@ -451,6 +470,12 @@ export function DevicePage() {
               )}
             </div>
             <div className="app-profiles__search">
+              <div className="app-profiles__catalog">
+                <button type="button" className="app-profiles__result" onClick={handleImportAppCatalog}>
+                  Import G HUB applications catalog…
+                </button>
+                {appImportStatus && <div className="app-profiles__searching">{appImportStatus}</div>}
+              </div>
               <input
                 className="app-profiles__search-input"
                 placeholder="Search for a game or application..."
