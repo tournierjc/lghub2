@@ -11,6 +11,8 @@ import {
   DeviceProfile,
   DpiConfig,
   ButtonAssignment,
+  LightingEffect,
+  LightingConfig,
 } from '../../shared/device-types';
 import { LOGITECH_VENDOR_ID, KNOWN_DEVICES, DEVICE_INDEX } from '../../shared/hidpp-protocol';
 import { mergeProfileStateWithScanned } from '../../shared/profile-utils';
@@ -383,6 +385,7 @@ export class DeviceService {
     if (!device) return;
     device.activeProfile = this.mergeProfileState(device.activeProfile, profile);
     this.macroRuntime.activateProfile(hidPath, device.activeProfile);
+    this.applyLightingFromProfile(hidPath, device.activeProfile);
   }
 
   syncActiveProfileDpiToHardware(hidPath: string, profile: DeviceProfile): boolean {
@@ -400,6 +403,38 @@ export class DeviceService {
 
   private mergeProfileState(currentProfile: DeviceProfile, profile: DeviceProfile): DeviceProfile {
     return mergeProfileStateWithScanned(profile, currentProfile);
+  }
+
+  private applyLightingFromProfile(hidPath: string, profile: DeviceProfile): void {
+    const device = this.managedDevices.get(hidPath);
+    if (!device) return;
+    if (!profile.lighting || profile.lighting.length === 0) return;
+
+    const EFFECT_ID_MAP: Partial<Record<LightingEffect, number>> = {
+      [LightingEffect.SOLID]: 0x01,
+      [LightingEffect.COLOR_CYCLE]: 0x03,
+      [LightingEffect.WAVE]: 0x04,
+      [LightingEffect.STARLIGHT]: 0x05,
+      [LightingEffect.BREATHING]: 0x0a,
+      [LightingEffect.RIPPLE]: 0x0b,
+    };
+
+    const defaultColor = { r: 0, g: 212, b: 255 };
+    const zones = device.lightingZones ?? [{ id: 'zone-0', name: 'Zone 1', ledCount: 1 }];
+
+    zones.forEach((zone, zoneIndex) => {
+      const config: LightingConfig | undefined = profile.lighting?.[zoneIndex] ?? profile.lighting?.[0];
+      if (!config) return;
+
+      const c = config.colors?.[0] ?? defaultColor;
+      if (config.effect === LightingEffect.SOLID || !EFFECT_ID_MAP[config.effect]) {
+        this.hidppService.setRgbZoneColor(hidPath, zoneIndex, c.r, c.g, c.b);
+        return;
+      }
+
+      const effectId = EFFECT_ID_MAP[config.effect] ?? EFFECT_ID_MAP[LightingEffect.SOLID] ?? 0x01;
+      this.hidppService.setRgbEffect(hidPath, zoneIndex, effectId, c.r, c.g, c.b, config.speed, config.brightness);
+    });
   }
 
   async refreshBattery(hidPath: string): Promise<void> {
