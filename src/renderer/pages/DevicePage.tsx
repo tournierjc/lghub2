@@ -32,8 +32,6 @@ const EFFECT_ID_MAP: Partial<Record<LightingEffect, number>> = {
   [LightingEffect.STARLIGHT]: 0x05,
   [LightingEffect.BREATHING]: 0x0a,
   [LightingEffect.RIPPLE]: 0x0b,
-  [LightingEffect.AUDIO_VISUALIZER]: 0x07,
-  [LightingEffect.SCREEN_SAMPLER]: 0x03,
 };
 
 interface AppEntry {
