@@ -63,6 +63,10 @@ const deviceApi = {
     ipcRenderer.invoke(IpcChannel.DEVICE_IMAGE_IMPORT, modelId, sourcePath) as Promise<{ ok: boolean; error?: string }>,
   clearCustomDeviceImage: (modelId: string) =>
     ipcRenderer.invoke(IpcChannel.DEVICE_IMAGE_CLEAR, modelId) as Promise<boolean>,
+  screenSamplerStart: (hidPath: string, zoneIndexes: number[], brightnessPct?: number) =>
+    ipcRenderer.invoke(IpcChannel.DEVICE_SCREEN_SAMPLER_START, hidPath, zoneIndexes, brightnessPct ?? 100) as Promise<boolean>,
+  screenSamplerStop: (hidPath: string) =>
+    ipcRenderer.invoke(IpcChannel.DEVICE_SCREEN_SAMPLER_STOP, hidPath) as Promise<boolean>,
 };
 
 const profileApi = {

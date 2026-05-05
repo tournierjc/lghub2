@@ -100,6 +100,8 @@ export enum IpcChannel {
   DEVICE_IMAGE_GET_CUSTOM_URL = 'device:image-get-custom-url',
   DEVICE_IMAGE_IMPORT = 'device:image-import',
   DEVICE_IMAGE_CLEAR = 'device:image-clear',
+  DEVICE_SCREEN_SAMPLER_START = 'device:screen-sampler-start',
+  DEVICE_SCREEN_SAMPLER_STOP = 'device:screen-sampler-stop',
   DEVICE_SET_SMART_SHIFT = 'device:set-smart-shift',
   DEVICE_GET_SMART_SHIFT = 'device:get-smart-shift',
 

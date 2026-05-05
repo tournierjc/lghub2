@@ -28,6 +28,12 @@ const STARLIGHT_SUPPORTED: LightingCapability[] = [
   LightingCapability.GAMEBOARD_RGB_ZONAL, LightingCapability.MOUSEPAD_RGB_ZONAL,
 ];
 
+const SCREEN_SAMPLER_SUPPORTED: LightingCapability[] = [
+  LightingCapability.MOUSE_RGB_ZONAL, LightingCapability.MOUSEPAD_RGB_ZONAL,
+  LightingCapability.SPEAKER_RGB_ZONAL, LightingCapability.GAMEBOARD_RGB_ZONAL,
+  LightingCapability.HEADSET_RGB_ZONAL,
+];
+
 const WAVE_SUPPORTED: LightingCapability[] = [
   LightingCapability.KEYBOARD_RGB_PER_KEY, LightingCapability.KEYBOARD_RGB_ZONAL,
   LightingCapability.MOUSEPAD_RGB_ZONAL, LightingCapability.GAMEBOARD_RGB_ZONAL,
@@ -87,6 +93,15 @@ export const EFFECT_PREFABS: EffectPrefab[] = [
     hasColor: true,
     hasSpeed: true,
     hasBrightness: true,
+  },
+  {
+    effect: LightingEffect.SCREEN_SAMPLER,
+    label: 'Screen Sampler',
+    deviceSupport: SCREEN_SAMPLER_SUPPORTED,
+    hasColor: false,
+    hasSpeed: false,
+    hasBrightness: true,
+    description: 'Matches color from screen center via software sampling. Choose zones and brightness, then Apply. Re-enable after switching profiles.',
   },
 ];
 

@@ -141,38 +141,60 @@ export function DevicePage() {
     if (!device || !activeProfile) return;
     const zoneIds = config.zones && config.zones.length > 0 ? config.zones : ['zone-0'];
     const nextLighting = [...(activeProfile.lighting || [])];
+    const hidPath = device.hidPath;
 
-    zoneIds.forEach((zoneId) => {
-      const zoneIndex = device.lightingZones?.findIndex((zone) => zone.id === zoneId) ?? 0;
-      const targetZoneIndex = zoneIndex >= 0 ? zoneIndex : 0;
-      nextLighting[targetZoneIndex] = {
-        ...config,
-        zones: [zoneId],
-      };
+    void (async () => {
+      await window.device.screenSamplerStop(hidPath);
 
-      if (config.effect === LightingEffect.SOLID) {
-        const c = config.colors[0] || { r: 0, g: 212, b: 255 };
-        dispatch(setDeviceRgb({ hidPath: device.hidPath, zoneIndex: targetZoneIndex, r: c.r, g: c.g, b: c.b }));
-      } else {
-        const c = config.colors[0] || { r: 0, g: 212, b: 255 };
-        const effectId = EFFECT_ID_MAP[config.effect] ?? EFFECT_ID_MAP[LightingEffect.SOLID] ?? 0x01;
-        dispatch(setDeviceRgbEffect({
-          hidPath: device.hidPath,
-          zoneIndex: targetZoneIndex,
-          effectId,
-          r: c.r, g: c.g, b: c.b,
-          speed: config.speed,
-          brightness: config.brightness,
-        }));
+      zoneIds.forEach((zoneId) => {
+        const zoneIndex = device.lightingZones?.findIndex((zone) => zone.id === zoneId) ?? 0;
+        const targetZoneIndex = zoneIndex >= 0 ? zoneIndex : 0;
+        nextLighting[targetZoneIndex] = {
+          ...config,
+          zones: [zoneId],
+        };
+
+        if (config.effect === LightingEffect.SCREEN_SAMPLER) return;
+
+        if (config.effect === LightingEffect.SOLID) {
+          const c = config.colors[0] || { r: 0, g: 212, b: 255 };
+          dispatch(setDeviceRgb({ hidPath, zoneIndex: targetZoneIndex, r: c.r, g: c.g, b: c.b }));
+        } else {
+          const c = config.colors[0] || { r: 0, g: 212, b: 255 };
+          const effectId = EFFECT_ID_MAP[config.effect] ?? EFFECT_ID_MAP[LightingEffect.SOLID] ?? 0x01;
+          dispatch(setDeviceRgbEffect({
+            hidPath,
+            zoneIndex: targetZoneIndex,
+            effectId,
+            r: c.r, g: c.g, b: c.b,
+            speed: config.speed,
+            brightness: config.brightness,
+          }));
+        }
+      });
+
+      dispatch(updateProfile({
+        modelId: device.modelId,
+        profileId: activeProfile.id,
+        updates: { lighting: nextLighting },
+      }));
+
+      if (config.effect === LightingEffect.SCREEN_SAMPLER) {
+        const zoneIndexes = zoneIds.map((zoneId) => {
+          const zi = device.lightingZones?.findIndex((zone) => zone.id === zoneId) ?? 0;
+          return zi >= 0 ? zi : 0;
+        });
+        await window.device.screenSamplerStart(hidPath, zoneIndexes, config.brightness ?? 100);
       }
-    });
-
-    dispatch(updateProfile({
-      modelId: device.modelId,
-      profileId: activeProfile.id,
-      updates: { lighting: nextLighting },
-    }));
+    })();
   }, [device, activeProfile, dispatch]);
+
+  useEffect(() => {
+    const path = device?.hidPath;
+    return () => {
+      if (path) void window.device.screenSamplerStop(path);
+    };
+  }, [device?.hidPath]);
 
   const handleButtonApply = useCallback(async (assignments: Record<string, ButtonAssignment>) => {
     if (!device || !activeProfile) return;

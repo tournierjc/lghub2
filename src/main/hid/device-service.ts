@@ -25,11 +25,16 @@ export class DeviceService {
   private hidppService: HidppService;
   private macroRuntime: MacroRuntime;
   private managedDevices = new Map<string, Device>();
+  private screenSamplerStop?: (hidPath: string) => void;
 
   constructor(hidManager: HidManager) {
     this.hidManager = hidManager;
     this.hidppService = new HidppService(hidManager);
     this.macroRuntime = new MacroRuntime(hidManager, this.hidppService);
+  }
+
+  registerScreenSamplerStop(fn: (hidPath: string) => void): void {
+    this.screenSamplerStop = fn;
   }
 
   async scanAndConnect(): Promise<Device[]> {
@@ -383,6 +388,7 @@ export class DeviceService {
   activateProfile(hidPath: string, profile: import('../../shared/device-types').DeviceProfile): void {
     const device = this.managedDevices.get(hidPath);
     if (!device) return;
+    this.screenSamplerStop?.(hidPath);
     device.activeProfile = this.mergeProfileState(device.activeProfile, profile);
     this.macroRuntime.activateProfile(hidPath, device.activeProfile);
     this.applyLightingFromProfile(hidPath, device.activeProfile);
@@ -425,6 +431,10 @@ export class DeviceService {
     zones.forEach((zone, zoneIndex) => {
       const config: LightingConfig | undefined = profile.lighting?.[zoneIndex] ?? profile.lighting?.[0];
       if (!config) return;
+
+      if (config.effect === LightingEffect.SCREEN_SAMPLER) {
+        return;
+      }
 
       const c = config.colors?.[0] ?? defaultColor;
       if (config.effect === LightingEffect.SOLID || !EFFECT_ID_MAP[config.effect]) {

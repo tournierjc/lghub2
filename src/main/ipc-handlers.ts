@@ -8,6 +8,7 @@ import { DeviceService } from './hid/device-service';
 import { ProfileStore } from './profile-store';
 import { MarketplaceService } from './marketplace-service';
 import { DeviceImageStore } from './device-image-store';
+import { ScreenSamplerService } from './screen-sampler-service';
 import { DeviceProfile } from '../shared/device-types';
 import { extractDetectionExecutables } from './app-detection';
 import { mergeProfileStateWithScanned } from '../shared/profile-utils';
@@ -50,6 +51,9 @@ export function registerIpcHandlers(window: BrowserWindow, hidManager: HidManage
   if (!deviceImageStore) {
     deviceImageStore = new DeviceImageStore();
   }
+
+  const screenSamplerService = new ScreenSamplerService(deviceService);
+  deviceService.registerScreenSamplerStop((hidPath) => screenSamplerService.stop(hidPath));
 
   // Window management
   ipcMain.on(IpcChannel.MINIMIZE, () => window.minimize());
@@ -132,6 +136,7 @@ export function registerIpcHandlers(window: BrowserWindow, hidManager: HidManage
   });
 
   ipcMain.on(IpcChannel.DEVICE_DISCONNECT, (_event, hidPath: string) => {
+    screenSamplerService.stop(hidPath);
     deviceService.disconnectDevice(hidPath);
   });
 
@@ -154,6 +159,16 @@ export function registerIpcHandlers(window: BrowserWindow, hidManager: HidManage
 
   ipcMain.handle(IpcChannel.DEVICE_IMAGE_CLEAR, (_event, modelId: string) => {
     return deviceImageStore!.clear(modelId);
+  });
+
+  ipcMain.handle(IpcChannel.DEVICE_SCREEN_SAMPLER_START, (_event, hidPath: string, zoneIndexes: number[], brightnessPct: number = 100) => {
+    screenSamplerService.start(hidPath, zoneIndexes, brightnessPct);
+    return true;
+  });
+
+  ipcMain.handle(IpcChannel.DEVICE_SCREEN_SAMPLER_STOP, (_event, hidPath: string) => {
+    screenSamplerService.stop(hidPath);
+    return true;
   });
 
   ipcMain.handle(IpcChannel.APP_DATA_SEARCH, (_event, query: string) => {
